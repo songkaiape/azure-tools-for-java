@@ -57,7 +57,8 @@ public final class RedisCacheUtil {
 	private static final String REQUIRE_LOCATION = "Location cannot be null or empty.";
 	private static final String REQUIRE_RESOURCE_GROUP = "Resource group cannot be null or empty.";
 	private static final String REQUIRE_PRICE_TIER = "Pricing tier cannot be null or empty.";
-
+	private static final String NEW_RES_GRP_ERROR_FORMAT = "The resource group: %s is already existed.";
+	
     public static LinkedHashMap<String, String> initSkus() {
     	LinkedHashMap<String, String> skus = new LinkedHashMap<String, String>();
         skus.put(C0_BASIC_SKU, "BASIC0");
@@ -81,7 +82,7 @@ public final class RedisCacheUtil {
         return skus;
     }
 
-    public static boolean doValidate(AzureManager azureManager, SubscriptionDetail currentSub, String dnsNameValue, String selectedRegionValue, String selectedResGrpValue, String selectedPriceTierValue) {
+    public static boolean doValidate(AzureManager azureManager, SubscriptionDetail currentSub, String dnsNameValue, String selectedRegionValue, String selectedResGrpValue, String selectedPriceTierValue,boolean newResGrp) {
     	if (currentSub == null) {
     		JOptionPane.showMessageDialog(null, REQUIRE_SUBSCRIPTION, "Alert", JOptionPane.ERROR_MESSAGE, null);
     		return false;
@@ -102,6 +103,14 @@ public final class RedisCacheUtil {
     		JOptionPane.showMessageDialog(null, REQUIRE_PRICE_TIER, "Alert", JOptionPane.ERROR_MESSAGE, null);
     		return false;
     	}
+    	try {
+    		if(newResGrp &&!canCreateNewResGrp(azureManager.getAzure(currentSub.getSubscriptionId()),selectedResGrpValue)) {
+    			JOptionPane.showMessageDialog(null, String.format(NEW_RES_GRP_ERROR_FORMAT, selectedResGrpValue), "Alert", JOptionPane.ERROR_MESSAGE, null);
+    			return false;
+    		}
+    	}catch (Exception ex) {
+            ex.printStackTrace();
+        }
     	try {
         	for (RedisCache existingRedisCache : azureManager.getAzure(currentSub.getSubscriptionId()).redisCaches().list()) {
         		if (existingRedisCache.name().equals(dnsNameValue)) {

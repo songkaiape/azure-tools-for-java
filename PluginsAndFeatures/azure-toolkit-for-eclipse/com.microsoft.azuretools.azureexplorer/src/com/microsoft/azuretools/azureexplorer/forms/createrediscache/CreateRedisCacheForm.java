@@ -434,7 +434,7 @@ public class CreateRedisCacheForm extends AzureTitleAreaDialogWrapper {
     protected void okPressed() {
         try {
             if (!RedisCacheUtil.doValidate(azureManager, currentSub, dnsNameValue, selectedLocationValue,
-                    selectedResGrpValue, selectedPriceTierValue)) {
+                    selectedResGrpValue, selectedPriceTierValue,newResGrp)) {
                 return;
             }
             Azure azure = azureManager.getAzure(currentSub.getSubscriptionId());
