@@ -34,6 +34,7 @@ import com.microsoft.azuretools.authmanage.AdAuthManager;
 import com.microsoft.azuretools.authmanage.CommonSettings;
 import com.microsoft.azuretools.authmanage.RefreshableTokenCredentials;
 import com.microsoft.azuretools.authmanage.SubscriptionManager;
+import com.microsoft.azuretools.telemetry.IntegrationTestInterceptor;
 import com.microsoft.azuretools.telemetry.TelemetryInterceptor;
 import com.microsoft.azuretools.utils.AzureRegisterProviderNamespaces;
 import com.microsoft.azuretools.utils.Pair;
@@ -134,6 +135,7 @@ public class AccessTokenAzureManager extends AzureManagerBase {
 //        return auth(token);
         return Azure.configure()
                 .withInterceptor(new TelemetryInterceptor())
+                .withInterceptor(new IntegrationTestInterceptor())
                 .withUserAgent(CommonSettings.USER_AGENT).authenticate(new RefreshableTokenCredentials(AdAuthManager.getInstance(), tid));
     }
 
