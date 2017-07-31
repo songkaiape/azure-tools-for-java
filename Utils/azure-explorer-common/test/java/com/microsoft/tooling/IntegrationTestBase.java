@@ -64,7 +64,6 @@ public abstract class IntegrationTestBase {
 
     public static Boolean IS_MOCKED = IsMocked();
     private static String azureAuthFile = getAuthFile();
-    public static Boolean NetworkStateOn=true;
     private Map<String, String> textReplacementRules = new HashMap<String, String>();
     private String currentTestName = null;
 
@@ -78,8 +77,6 @@ public abstract class IntegrationTestBase {
     protected TestRecord testRecord;
 
     public Interceptor interceptor;
-
-    
 
     @Rule
     public TestName name = new TestName();
@@ -125,8 +122,8 @@ public abstract class IntegrationTestBase {
         } else {
             try {
                 credentials = ApplicationTokenCredentials.fromFile(new File(azureAuthFile));
-            }catch(Exception e){
-                throw new Exception("Fail to open auth file:"+azureAuthFile);              
+            } catch (Exception e) {
+                throw new Exception("Fail to open auth file:" + azureAuthFile);
             }
             defaultSubscription = credentials.defaultSubscriptionId();
         }
@@ -134,28 +131,12 @@ public abstract class IntegrationTestBase {
         interceptor = new Interceptor() {
             @Override
             public Response intercept(Chain chain) throws IOException {
-                if (IS_MOCKED) {
-                    String url=chain.request().url().toString();
-                    if(!NetworkStateOn) {
-                        return redirectErrorHost(chain);
-                    }
-                    if (url.contains("BeforeNetwork")&&chain.request().method().equalsIgnoreCase("get")) {
-                        NetworkStateOn = false;
-                    }
+                if (IS_MOCKED) {                    
                     return registerRecordedResponse(chain);
-                }
-                else {
-                    String url=chain.request().url().toString();
-                    if(!NetworkStateOn) {
-                        return redirectErrorHost(chain);
-                    }
-                    if (url.contains("BeforeNetwork")&&chain.request().method().equalsIgnoreCase("get")) {
-                        NetworkStateOn = false;
-                    }
-
+                } else {
                     return chain.proceed(chain.request());
                 }
-               
+
             }
         };
         RestClient restClient = createRestClient(credentials);
@@ -173,7 +154,6 @@ public abstract class IntegrationTestBase {
         wireMock.resetMappings();
         testRecord = null;
         currentTestName = null;
-        NetworkStateOn = true;
     }
 
     private RestClient createRestClient(ApplicationTokenCredentials credentials) throws Exception {
@@ -183,20 +163,14 @@ public abstract class IntegrationTestBase {
             credentials = new TestCredentials();
             restClient = new RestClient.Builder().withBaseUrl(MOCK_URI + "/")
                     .withSerializerAdapter(new AzureJacksonAdapter())
-                    .withResponseBuilderFactory(new AzureResponseBuilder.Factory())
-                    .withCredentials(credentials)
-                    //.withLogLevel(LogLevel.BODY_AND_HEADERS)
-                    .withInterceptor(interceptor)
-                    .build();
+                    .withResponseBuilderFactory(new AzureResponseBuilder.Factory()).withCredentials(credentials)
+                    .withLogLevel(LogLevel.BODY_AND_HEADERS).withInterceptor(interceptor).build();
             return restClient;
         } else {
             restClient = new RestClient.Builder().withBaseUrl(GLOBAL_ENDPOINT)
                     .withSerializerAdapter(new AzureJacksonAdapter())
-                    .withResponseBuilderFactory(new AzureResponseBuilder.Factory())
-                    .withCredentials(credentials)
-                    .withLogLevel(LogLevel.BODY_AND_HEADERS)
-                    .withInterceptor(interceptor)
-                    .build();
+                    .withResponseBuilderFactory(new AzureResponseBuilder.Factory()).withCredentials(credentials)
+                    .withLogLevel(LogLevel.BODY_AND_HEADERS).withInterceptor(interceptor).build();
             return restClient;
         }
     }
@@ -307,32 +281,19 @@ public abstract class IntegrationTestBase {
     }
 
     private static Boolean IsMocked() {
-        String keyValue=System.getProperty("isMockedCase");
-        if (keyValue!=null&&keyValue.equalsIgnoreCase("false"))
+        String keyValue = System.getProperty("isMockedCase");
+        if (keyValue != null && keyValue.equalsIgnoreCase("false"))
             return false;
         return true;
     }
-    
-    private synchronized Response redirectErrorHost(Interceptor.Chain chain) throws IOException {
-        Request request=chain.request();
-        String url=chain.request().url().toString();
-        if(IS_MOCKED) {
-            url=url.replace(MOCK_URI, "https://management.notexistazure.com");
-        }
-        else {
-        url=url.replace(GLOBAL_ENDPOINT, "https://management.notexistazure.com");
-        }
-        Request newRequest=request.newBuilder().url(url).build();
-        return chain.proceed(newRequest);
-    
-    }
-    //get auth file for nonmock case
-    //-DisMockedCase=false -DauthFilePath="c:\config.azureauth"
+
+    // get auth file for nonmock case
+    // -DisMockedCase=false -DauthFilePath="c:\config.azureauth"
     private static String getAuthFile() {
-        String authFilePath=System.getProperty("authFilePath");
+        String authFilePath = System.getProperty("authFilePath");
         return authFilePath;
     }
-    
+
     private File getRecordFile() {
         URL folderUrl = IntegrationTestBase.class.getClassLoader().getResource(".");
         File folderFile = new File(folderUrl.getPath() + RECORD_FOLDER);

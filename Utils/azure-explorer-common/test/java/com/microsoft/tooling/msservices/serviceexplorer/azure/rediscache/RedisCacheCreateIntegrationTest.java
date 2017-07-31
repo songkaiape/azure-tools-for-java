@@ -129,10 +129,6 @@ public class RedisCacheCreateIntegrationTest extends IntegrationTestBase {
             priceTier.get("STD3"), false, true);
     RedisCreateConfig RgNotExistConfig = new RedisCreateConfig("MonaP3Exist", "East US", "NotExistRg",
             priceTier.get("PREMIUM3"), false, false);
-    RedisCreateConfig BeforeNetworkFailedConfig = new RedisCreateConfig("BeforeNetwork", "East US", "BlockNetworkRg",
-            priceTier.get("PREMIUM1"), false, true);
-    RedisCreateConfig AfterNetworkFailedConfig = new RedisCreateConfig("AfterNetwork", "East US", "CutNetworkRg",
-            priceTier.get("STD1"), false, true);
 
     @Before
     public void setUp() throws Exception {
@@ -219,22 +215,6 @@ public class RedisCacheCreateIntegrationTest extends IntegrationTestBase {
         expectedEx.expect(com.microsoft.azure.CloudException.class);
         expectedEx.expectMessage("Resource group 'NotExistRg' could not be found.");
         CreateRedisCache(azureManagerMock, currentsub, RgNotExistConfig);
-    }
-
-    @Test
-    public void testRedisCacheCreateBeforeNetworkFailed() throws Exception {
-        expectedEx.expect(java.lang.RuntimeException.class);
-        expectedEx.expectMessage("management.notexistazure.com");
-        CreateRedisCache(azureManagerMock, currentsub, BeforeNetworkFailedConfig);
-
-    }
-
-    @Test
-    public void testRedisCacheCreateAfterNetworkFailed() throws Exception {
-        expectedEx.expect(java.lang.RuntimeException.class);
-        expectedEx.expectMessage("management.notexistazure.com");
-        NetworkStateOn = false;
-        CreateRedisCache(azureManagerMock, currentsub, AfterNetworkFailedConfig);
     }
 
     @After
@@ -341,11 +321,7 @@ public class RedisCacheCreateIntegrationTest extends IntegrationTestBase {
         ProcessingStrategy processor = RedisCacheUtil.doGetProcessor(azure, skus, config.dnsNameValue,
                 config.selectedLocationValue, config.selectedResGrpValue, config.selectedPriceTierValue,
                 config.noSSLPort, config.newResGrp);
-        try {
-            processor.process();
-        } catch (Exception e) {
-            throw e;
-        }
+        processor.process();
     }
 
     private class RedisCreateConfig {
