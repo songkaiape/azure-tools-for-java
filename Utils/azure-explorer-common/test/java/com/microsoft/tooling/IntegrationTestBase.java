@@ -68,7 +68,7 @@ public abstract class IntegrationTestBase {
     private String currentTestName = null;
 
     @Rule
-    public WireMockRule wireMock = new WireMockRule(options().port(Integer.parseInt(MOCK_PORT)));
+    public WireMockRule wireMock = new WireMockRule(options().bindAddress(MOCK_HOST).port(Integer.parseInt(MOCK_PORT)));
 
     protected TestRecord testRecord;
 
@@ -132,7 +132,6 @@ public abstract class IntegrationTestBase {
         if (!currentTestName.equals(testName)) {
             return;
         }
-        wireMock=null;
         restClient=null;
         testRecord = null;
         currentTestName = null;
