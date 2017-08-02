@@ -132,6 +132,7 @@ public abstract class IntegrationTestBase {
         if (!currentTestName.equals(testName)) {
             return;
         }
+        wireMock.resetMappings();
         restClient=null;
         testRecord = null;
         currentTestName = null;
