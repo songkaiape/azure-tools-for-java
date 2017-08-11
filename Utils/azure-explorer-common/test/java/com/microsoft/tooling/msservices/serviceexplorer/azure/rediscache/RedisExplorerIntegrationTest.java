@@ -121,13 +121,12 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
 
     @Before
     public void setUp() throws Exception {
-        setUpStep();
-
         // this case only run in Nonmock mode, need to set up a redis database and and
         // add proper test data,
         // set VM argument: -DisMockedCase=false -DauthFilePath="c:\config.azureauth"
-        assumeThat(IS_MOCKED, is(false));
 
+        assumeThat(IS_MOCKED, is(false));
+        setUpStep();
         redisExplorerPresenter.onAttachView(redisExplorerMvpViewMock);
         redisExplorerPresenter.initializeResourceData(this.defaultSubscription, redisID);
         SchedulerProviderFactory.getInstance().init(testSchedulerProvider);
@@ -293,7 +292,9 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
 
     @After
     public void tearDown() throws Exception {
-        resetTest(name.getMethodName());
+        if (!IS_MOCKED) {
+            resetTest(name.getMethodName());
+        }
     }
 
     private ArrayList<String> flatList(ArrayList<String[]> valueData) {
