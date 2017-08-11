@@ -322,7 +322,6 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
 
         PowerMockito.mockStatic(DefaultLoader.class);
         when(DefaultLoader.getUIHelper()).thenReturn(uiHelper);
-        when(uiHelper.isDarkTheme()).thenReturn(false);
 
         String redisCacheQueryString = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Cache/Redis/%s";
         redisID = String.format(redisCacheQueryString, defaultSubscription, RESOURCE_GROUP, REDIS_NAME);
