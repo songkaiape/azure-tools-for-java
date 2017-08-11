@@ -32,8 +32,12 @@ import com.intellij.execution.runners.ProgramRunner;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.project.Project;
 import com.microsoft.azure.management.appservice.WebApp;
+import com.microsoft.azure.management.resources.ResourceGroup;
+import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.core.mvp.ui.base.SchedulerProviderFactory;
+import com.microsoft.azuretools.utils.AzureUIRefreshCore;
+import com.microsoft.azuretools.utils.AzureUIRefreshEvent;
 import com.microsoft.azuretools.utils.WebAppUtils;
 import com.microsoft.intellij.runner.RunProcessHandler;
 import org.apache.commons.net.ftp.FTPClient;
@@ -97,8 +101,6 @@ public class WebAppRunState implements RunProfileState {
                 processHandler.setText(NO_WEBAPP);
                 processHandler.setText(STOP_DEPLOY);
                 throw new Exception(NO_WEBAPP);
-            } else {
-                updateConfigurationDataModel(webApp);
             }
 
             processHandler.setText(GETTING_DEPLOYMENT_CREDENTIAL);
@@ -143,12 +145,29 @@ public class WebAppRunState implements RunProfileState {
             }
             processHandler.setText(DEPLOY_SUCCESSFUL);
             processHandler.setText("URL: " + url);
-            return true;
+            return webApp;
         })
                 .subscribeOn(SchedulerProviderFactory.getInstance().getSchedulerProvider().io())
-                .subscribe(isSucceeded -> {
+                .subscribe(webApp -> {
                     processHandler.notifyComplete();
-                    AzureWebAppMvpModel.getInstance().listWebApps(true);
+                    if (webAppSettingModel.isCreatingNew() && AzureUIRefreshCore.listeners != null) {
+                        try {
+                            ResourceGroup resourceGroup = AzureMvpModel.getInstance()
+                                    .getResourceGroupBySubscriptionIdAndName(webAppSettingModel.getSubscriptionId(),
+                                            webAppSettingModel.getResourceGroup());
+                            AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH,
+                                    new WebAppUtils.WebAppDetails(resourceGroup, webApp,
+                                            null /*appServicePlan*/,
+                                            null /*appServicePlanResourceGroup*/,
+                                            null /*subscriptionDetail*/
+                                    )));
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                    }
+                    updateConfigurationDataModel(webApp);
+                    AzureWebAppMvpModel.getInstance().listWebApps(true /*force*/);
                 }, err -> {
                     processHandler.setText(err.getMessage());
                     processHandler.notifyComplete();
