@@ -88,7 +88,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
     private UIHelper uiHelper;
 
     @Mock
-    private RedisExplorerMvpView redisExplorerMvpView;
+    private RedisExplorerMvpView redisExplorerMvpViewMock;
 
     private Azure azure;
 
@@ -128,7 +128,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         // set VM argument: -DisMockedCase=false -DauthFilePath="c:\config.azureauth"
         assumeThat(IS_MOCKED, is(false));
 
-        redisExplorerPresenter.onAttachView(redisExplorerMvpView);
+        redisExplorerPresenter.onAttachView(redisExplorerMvpViewMock);
         redisExplorerPresenter.initializeResourceData(this.defaultSubscription, redisID);
         SchedulerProviderFactory.getInstance().init(testSchedulerProvider);
         when(DefaultLoader.getIdeHelper()).thenReturn(mockIDEHelper);
@@ -138,7 +138,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
     public void testOnDbSelect() throws Exception {
         redisExplorerPresenter.onReadDbNum();
         testSchedulerProvider.triggerActions();
-        verify(redisExplorerMvpView).renderDbCombo(Mockito.anyInt());
+        verify(redisExplorerMvpViewMock).renderDbCombo(Mockito.anyInt());
     }
 
     @Test
@@ -148,17 +148,17 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
 
         redisExplorerPresenter.onDbSelect(TEST_DB);
         testSchedulerProvider.triggerActions();
-        verify(redisExplorerMvpView).showScanResult(Mockito.any(RedisScanResult.class));
+        verify(redisExplorerMvpViewMock).showScanResult(Mockito.any(RedisScanResult.class));
 
         ArgumentCaptor<RedisScanResult> argument = ArgumentCaptor.forClass(RedisScanResult.class);
-        verify(redisExplorerMvpView).showScanResult(argument.capture());
+        verify(redisExplorerMvpViewMock).showScanResult(argument.capture());
         List<String> keys = argument.getValue().getKeys();
         Collections.sort(keys);
         assertEquals(keys, expectedList);
 
         redisExplorerPresenter.onDbSelect(EMPTY_DB);
         testSchedulerProvider.triggerActions();
-        verify(redisExplorerMvpView, times(2)).showScanResult(argument.capture());
+        verify(redisExplorerMvpViewMock, times(2)).showScanResult(argument.capture());
         assertEquals(argument.getValue().getKeys().size(), 0);
     }
 
@@ -171,7 +171,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onKeyList(TEST_DB, testCursor, TEST_PATTERN);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisScanResult> argument = ArgumentCaptor.forClass(RedisScanResult.class);
-        verify(redisExplorerMvpView).showScanResult(argument.capture());
+        verify(redisExplorerMvpViewMock).showScanResult(argument.capture());
 
         List<String> keys = argument.getValue().getKeys();
         Collections.sort(keys);
@@ -188,7 +188,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         testSchedulerProvider.triggerActions();
 
         ArgumentCaptor<RedisScanResult> argument = ArgumentCaptor.forClass(RedisScanResult.class);
-        verify(redisExplorerMvpView).showScanResult(argument.capture());
+        verify(redisExplorerMvpViewMock).showScanResult(argument.capture());
 
         List<String> keys = argument.getValue().getKeys();
         Collections.sort(keys);
@@ -204,7 +204,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onkeySelect(TEST_DB, STRING_KEY);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisValueData> argument = ArgumentCaptor.forClass(RedisValueData.class);
-        verify(redisExplorerMvpView).showContent(argument.capture());
+        verify(redisExplorerMvpViewMock).showContent(argument.capture());
 
         ArrayList<String> values = flatList(argument.getValue().getRowData());
         Collections.sort(values);
@@ -223,7 +223,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onkeySelect(TEST_DB, LIST_KEY);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisValueData> argument = ArgumentCaptor.forClass(RedisValueData.class);
-        verify(redisExplorerMvpView).showContent(argument.capture());
+        verify(redisExplorerMvpViewMock).showContent(argument.capture());
 
         ArrayList<String> values = flatList(argument.getValue().getRowData());
         Collections.sort(values);
@@ -240,7 +240,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onkeySelect(TEST_DB, SET_KEY);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisValueData> argument = ArgumentCaptor.forClass(RedisValueData.class);
-        verify(redisExplorerMvpView).showContent(argument.capture());
+        verify(redisExplorerMvpViewMock).showContent(argument.capture());
 
         ArrayList<String> values = flatList(argument.getValue().getRowData());
         Collections.sort(values);
@@ -257,7 +257,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onkeySelect(TEST_DB, ZSET_KEY);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisValueData> argument = ArgumentCaptor.forClass(RedisValueData.class);
-        verify(redisExplorerMvpView).showContent(argument.capture());
+        verify(redisExplorerMvpViewMock).showContent(argument.capture());
 
         ArrayList<String> values = flatList(argument.getValue().getRowData());
         Collections.sort(values);
@@ -274,7 +274,7 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         redisExplorerPresenter.onkeySelect(TEST_DB, HASHSET_KEY);
         testSchedulerProvider.triggerActions();
         ArgumentCaptor<RedisValueData> argument = ArgumentCaptor.forClass(RedisValueData.class);
-        verify(redisExplorerMvpView).showContent(argument.capture());
+        verify(redisExplorerMvpViewMock).showContent(argument.capture());
 
         ArrayList<String> values = flatList(argument.getValue().getRowData());
         Collections.sort(values);
@@ -287,8 +287,8 @@ public class RedisExplorerIntegrationTest extends IntegrationTestBase {
         String nonExistedKey = "nonExisted";
         redisExplorerPresenter.onGetKeyAndValue(TEST_DB, nonExistedKey);
         testSchedulerProvider.triggerActions();
-        verify(redisExplorerMvpView).getKeyFail();
-        verify(redisExplorerMvpView, times(0)).showContent(null);
+        verify(redisExplorerMvpViewMock).getKeyFail();
+        verify(redisExplorerMvpViewMock, times(0)).showContent(null);
     }
 
     @After
