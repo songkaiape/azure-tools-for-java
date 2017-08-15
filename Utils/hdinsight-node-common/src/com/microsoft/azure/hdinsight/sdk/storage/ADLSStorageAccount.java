@@ -21,14 +21,28 @@
  */
 package com.microsoft.azure.hdinsight.sdk.storage;
 
+import com.microsoft.azure.hdinsight.sdk.cluster.ClusterIdentity;
 import com.microsoft.azure.hdinsight.sdk.cluster.IClusterDetail;
+import com.microsoft.azure.hdinsight.sdk.common.HDIException;
+import com.microsoft.azuretools.azurecommons.helpers.NotNull;
+import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.model.ServiceTreeItem;
 
 public class ADLSStorageAccount implements IHDIStorageAccount, ServiceTreeItem {
-    private String name;
+    private final String name;
     private boolean isDefaultStorageAccount;
-    private String defaultRootFolderPath;
-    private IClusterDetail clusterDetail;
+    private final String defaultRootFolderPath;
+    private final IClusterDetail clusterDetail;
+    private final ClusterIdentity clusterIdentity;
+    private ADLSCertificateInfo certificateInfo;
+
+    public ADLSStorageAccount(IClusterDetail clusterDetail, String name, boolean isDefault, String defaultRootPath, ClusterIdentity clusterIdentity) {
+        this.name = name;
+        this.isDefaultStorageAccount = isDefault;
+        this.defaultRootFolderPath = defaultRootPath;
+        this.clusterDetail = clusterDetail;
+        this.clusterIdentity = clusterIdentity;
+    }
 
     @Override
     public boolean isLoading() {
@@ -60,11 +74,22 @@ public class ADLSStorageAccount implements IHDIStorageAccount, ServiceTreeItem {
         return defaultRootFolderPath;
     }
 
-    public ADLSStorageAccount(IClusterDetail clusterDetail, String name, boolean isDefault, String defaultRootPath) {
-//        super(name.replace(".blob.core.windows.net", ""));
-        this.name = name;
-        this.isDefaultStorageAccount = isDefault;
-        this.defaultRootFolderPath = defaultRootPath;
-        this.clusterDetail = clusterDetail;
+    @NotNull
+    public ClusterIdentity getClusterIdentity() {
+        return this.clusterIdentity;
+    }
+
+    @NotNull
+    public ADLSCertificateInfo getCertificateInfo() throws HDIException {
+        if (this.certificateInfo == null) {
+            try {
+                this.certificateInfo = new ADLSCertificateInfo(this.clusterIdentity);
+                return certificateInfo;
+            } catch (Exception e) {
+                throw  new HDIException("get ADLS certificate error", e.getMessage());
+            }
+        } else {
+            return this.certificateInfo;
+        }
     }
 }

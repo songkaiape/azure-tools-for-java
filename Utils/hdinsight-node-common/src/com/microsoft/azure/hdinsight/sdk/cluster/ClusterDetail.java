@@ -212,8 +212,9 @@ public class ClusterDetail implements IClusterDetail {
             }
 
             Map<String,String> coresSiteMap = configurations.getCoresite();
+            ClusterIdentity clusterIdentity = configurations.getClusterIdentity();
             if(coresSiteMap!= null){
-                this.defaultStorageAccount = getDefaultStorageAccount(coresSiteMap);
+                this.defaultStorageAccount = getDefaultStorageAccount(coresSiteMap, clusterIdentity);
                 this.additionalStorageAccounts = getAdditionalStorageAccounts(coresSiteMap);
             }
         }
@@ -221,7 +222,7 @@ public class ClusterDetail implements IClusterDetail {
         isConfigInfoAvailable = true;
     }
 
-    private IHDIStorageAccount getDefaultStorageAccount(Map<String, String> coresiteMap) throws HDIException{
+    private IHDIStorageAccount getDefaultStorageAccount(Map<String, String> coresiteMap, ClusterIdentity clusterIdentity) throws HDIException{
         String containerAddress = null;
         if(coresiteMap.containsKey(DefaultFS)){
             containerAddress = coresiteMap.get(DefaultFS);
@@ -243,7 +244,7 @@ public class ClusterDetail implements IClusterDetail {
             if(coresiteMap.containsKey(ADLS_HOME_MOUNTPOINT)) {
                 defaultRootPath = coresiteMap.get(ADLS_HOME_MOUNTPOINT);
             }
-            return new ADLSStorageAccount(this, accountName, true, defaultRootPath);
+            return new ADLSStorageAccount(this, accountName, true, defaultRootPath, clusterIdentity);
         } else {
             String storageAccountName = getStorageAccountName(containerAddress);
             if(storageAccountName == null){

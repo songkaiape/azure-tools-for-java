@@ -21,33 +21,29 @@
  */
 package com.microsoft.azure.hdinsight.sdk.storage.adls;
 
+import com.microsoft.aad.adal4j.*;
 import com.microsoft.azure.datalake.store.ADLException;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.IfExists;
 import com.microsoft.azure.hdinsight.common.HDInsightLoader;
 import com.microsoft.azure.hdinsight.sdk.common.HDIException;
+import com.microsoft.azure.hdinsight.sdk.storage.ADLSCertificateInfo;
+import com.microsoft.azure.hdinsight.sdk.storage.ADLSStorageAccount;
 import com.microsoft.azure.hdinsight.sdk.storage.IHDIStorageAccount;
-import com.microsoft.azure.hdinsight.spark.common.SparkBatchSubmission;
 import com.microsoft.azure.management.dns.HttpStatusCode;
-import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.azurecommons.helpers.NotNull;
-import com.microsoft.azuretools.sdkmanage.AzureManager;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.impl.client.HttpClients;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.io.*;
+import java.net.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class WebHDFSUtils {
+    private static ExecutorService service = null;
+
     private static String getUserAgent() {
         final String installID = HDInsightLoader.getHDInsightHelper().getInstallationId();
         final String userAgentSource = WebHDFSUtils.class.getClassLoader().getClass().getName().toLowerCase().contains("intellij")
@@ -55,11 +51,30 @@ public class WebHDFSUtils {
         return userAgentSource + installID;
     }
 
-    public static void uploadFileToADLS(@NotNull IHDIStorageAccount storageAccount, @NotNull File localFile, @NotNull String remotePath, boolean overWrite) throws Exception {
-        com.microsoft.azuretools.sdkmanage.AzureManager manager = AuthMethodManager.getInstance().getAzureManager();
-        String tid = manager.getSubscriptionManager().getSubscriptionTenant(storageAccount.getSubscriptionId());
-        String accessToken = manager.getAccessToken(tid);
+    private static String getAccessTokenFromCertificate(@NotNull ADLSStorageAccount storageAccount) throws ExecutionException, InterruptedException, MalformedURLException, HDIException {
+        if (service == null) {
+            synchronized (WebHDFSUtils.class) {
+                if (service == null) {
+                    service = Executors.newFixedThreadPool(5);
+                }
+            }
+        }
 
+        final ADLSCertificateInfo certificateInfo = storageAccount.getCertificateInfo();
+        AuthenticationContext ctx = new AuthenticationContext(certificateInfo.getAadTenantId(), true, service);
+        AsymmetricKeyCredential asymmetricKeyCredential = AsymmetricKeyCredential.create(certificateInfo.getClientId(), certificateInfo.getKey(), certificateInfo.getCertificate());
+        final Future<AuthenticationResult> result = ctx.acquireToken(certificateInfo.getResourceUri(), asymmetricKeyCredential , null);
+        final AuthenticationResult ar = result.get();
+        return ar.getAccessToken();
+    }
+
+    public static void uploadFileToADLS(@NotNull IHDIStorageAccount storageAccount, @NotNull File localFile, @NotNull String remotePath, boolean overWrite) throws Exception {
+        if (!(storageAccount instanceof ADLSStorageAccount)) {
+            throw new HDIException("the storage type should be ADLS");
+        }
+
+        ADLSStorageAccount adlsStorageAccount = (ADLSStorageAccount)storageAccount;
+        String accessToken = getAccessTokenFromCertificate(adlsStorageAccount);
         // TODO: accountFQDN should work for Mooncake
         String storageName = storageAccount.getName();
         ADLStoreClient client = ADLStoreClient.createClient(String.format("%s.azuredatalakestore.net", storageName), accessToken);
