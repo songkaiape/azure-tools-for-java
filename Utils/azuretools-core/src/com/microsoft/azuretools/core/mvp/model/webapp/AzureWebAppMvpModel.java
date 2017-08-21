@@ -39,6 +39,7 @@ import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.sdkmanage.AzureManager;
 import com.microsoft.azuretools.utils.AzulZuluModel;
+import com.microsoft.azuretools.utils.IProgressIndicator;
 import com.microsoft.azuretools.utils.WebAppUtils;
 
 import java.io.IOException;
@@ -50,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AzureWebAppMvpModel {
+
     private final Map<String, List<ResourceEx<WebApp>>> subscriptionIdToWebAppsMap;
     private final Map<String, List<ResourceEx<SiteInner>>> subscriptionIdToWebAppsOnLinuxMap;
 
@@ -62,7 +64,40 @@ public class AzureWebAppMvpModel {
         return SingletonHolder.INSTANCE;
     }
 
-    private static WebApp.DefinitionStages.WithCreate withCreateNewSPlan(
+    /**
+     * get the web app by ID.
+     */
+    public WebApp getWebAppById(String sid, String id) throws IOException {
+        Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
+        return azure.webApps().getById(id);
+    }
+
+    /**
+     * Create an Azure web app service.
+     */
+    public WebApp createWebApp(@NotNull WebAppSettingModel model) throws Exception {
+        Azure azure = AuthMethodManager.getInstance().getAzureClient(model.getSubscriptionId());
+
+        WebApp.DefinitionStages.WithCreate withCreate;
+        if (model.isCreatingAppServicePlan()) {
+            withCreate = withCreateNewSPlan(azure, model);
+        } else {
+            withCreate = withCreateExistingSPlan(azure, model);
+        }
+
+        WebApp webApp;
+        if (WebAppSettingModel.JdkChoice.DEFAULT.toString().equals(model.getJdkChoice())) {
+            webApp = withCreate
+                    .withJavaVersion(JavaVersion.JAVA_8_NEWEST)
+                    .withWebContainer(WebContainer.fromString(model.getWebContainer()))
+                    .create();
+        } else {
+            webApp = withCreate.create();
+        }
+        return webApp;
+    }
+
+    private WebApp.DefinitionStages.WithCreate withCreateNewSPlan(
             @NotNull Azure azure,
             @NotNull WebAppSettingModel model) throws Exception {
         String[] tierSize = model.getPricing().split("_");
@@ -99,7 +134,7 @@ public class AzureWebAppMvpModel {
         return withCreateWebApp;
     }
 
-    private static WebApp.DefinitionStages.WithCreate withCreateExistingSPlan(
+    private WebApp.DefinitionStages.WithCreate withCreateExistingSPlan(
             @NotNull Azure azure,
             @NotNull WebAppSettingModel model) {
         AppServicePlan servicePlan = azure.appServices().appServicePlans().getById(model.getAppServicePlanId());
@@ -115,34 +150,6 @@ public class AzureWebAppMvpModel {
         }
 
         return withCreate;
-    }
-
-    public WebApp getWebAppById(String sid, String id) throws IOException {
-        Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
-        return azure.webApps().getById(id);
-    }
-
-    // TODO
-    public WebApp createWebApp(@NotNull WebAppSettingModel model) throws Exception {
-        Azure azure = AuthMethodManager.getInstance().getAzureClient(model.getSubscriptionId());
-
-        WebApp.DefinitionStages.WithCreate withCreate;
-        if (model.isCreatingAppServicePlan()) {
-            withCreate = withCreateNewSPlan(azure, model);
-        } else {
-            withCreate = withCreateExistingSPlan(azure, model);
-        }
-
-        WebApp webApp;
-        if (WebAppSettingModel.JdkChoice.DEFAULT.toString().equals(model.getJdkChoice())) {
-            webApp = withCreate
-                    .withJavaVersion(JavaVersion.JAVA_8_NEWEST)
-                    .withWebContainer(WebContainer.fromString(model.getWebContainer()))
-                    .create();
-        } else {
-            webApp = withCreate.create();
-        }
-        return webApp;
     }
 
     public void deployWebApp() {
