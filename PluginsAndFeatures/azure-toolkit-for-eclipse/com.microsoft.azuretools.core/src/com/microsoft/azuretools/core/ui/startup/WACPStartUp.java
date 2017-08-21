@@ -166,7 +166,7 @@ public class WACPStartUp implements IStartup {
 
 		Display.getDefault().syncExec(new Runnable() {
 			public void run() {
-				if (isHDInsight && !Activator.getDefault().isHDInsightEnabled()) {
+				if (isHDInsight && Activator.getDefault().isScalaInstallationTipNeeded()) {
 					boolean isShowHDInsightTips = true;
 					HDInsightScalaHelpDlg hdInsightHelpDlg = new HDInsightScalaHelpDlg(Display.getDefault().getActiveShell());
 					if (hdInsightHelpDlg.open() == Window.CANCEL && !hdInsightHelpDlg.isShowTipsStatus()) {

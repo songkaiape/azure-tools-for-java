@@ -100,8 +100,6 @@ public class Activator extends AbstractUIPlugin implements PluginComponent {
     public static final String CONSOLE_NAME = Messages.consoleName;
     
     private static final EventListenerList DEPLOYMENT_EVENT_LISTENERS = new EventListenerList();
-
-    private boolean isHDInsightEnabled = false;
     
     private Collection<String> obsoletePackages;
     
@@ -113,7 +111,6 @@ public class Activator extends AbstractUIPlugin implements PluginComponent {
      */
     public Activator() {
     }
-
     /*
      * (non-Javadoc)
      * @see org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext)
@@ -133,7 +130,6 @@ public class Activator extends AbstractUIPlugin implements PluginComponent {
         } catch (IOException e) {
             showException("Azure Core Plugin", "An error occurred while attempting to load settings for the Azure Core plugin.", e);
         }
-        isHDInsightEnabled = isHDInsightEnabled(context);
         findObsoletePackages(context);
         super.start(context);
     }
@@ -204,26 +200,14 @@ public class Activator extends AbstractUIPlugin implements PluginComponent {
 		return ret;
 	}
     
-    public boolean isHDInsightEnabled() {
-        return isHDInsightEnabled;
-    }
-    
     public Collection<String> getObsoletePackages() {
     	return obsoletePackages;
     }
     
-    private boolean isHDInsightEnabled(BundleContext context) {
-        Bundle [] bundles = context.getBundles();
-        boolean isScalaEnabled = false, isHDIEnabled = false;
-        for(int i = 0; i < bundles.length; ++i) {
-            String symbolicName = bundles[i].getSymbolicName().toLowerCase();
-            if(symbolicName.contains("scala-ide")) {
-                isScalaEnabled = true;
-            } else if(symbolicName.equals("com.microsoft.azuretools.hdinsight")) {
-                isHDIEnabled = true;
-            }
-        }
-        return isScalaEnabled && isHDIEnabled;
+    public boolean isScalaInstallationTipNeeded() {    	
+    	boolean isScalaPluginInstalled = PluginUtil.checkPlugInInstallation("org.scala-ide.sdt.core");
+    	boolean isHDInsightSelected = PluginUtil.checkPlugInInstallation("com.microsoft.azuretools.hdinsight");
+    	return isHDInsightSelected && !isScalaPluginInstalled;
     }
     
     private void findObsoletePackages(BundleContext context) {

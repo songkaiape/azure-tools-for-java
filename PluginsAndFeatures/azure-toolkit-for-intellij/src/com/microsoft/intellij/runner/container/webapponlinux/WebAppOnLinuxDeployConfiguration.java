@@ -65,15 +65,15 @@ public class WebAppOnLinuxDeployConfiguration extends RunConfigurationBase {
     private static final String MISSING_ARTIFACT = "A web archive (.war) artifact has not been configured.";
     private static final String INVALID_WAR_FILE = "The artifact name %s is invalid. "
             + "An artifact name may contain only the ASCII letters 'a' through 'z' (case-insensitive), "
-            + "and the digits '0' through '9',  '-' and '_'.";
-    private static final String WAR_NAME_REGEX = "^[A-Za-z0-9_-]+\\.war$";
+            + "and the digits '0' through '9', '.', '-' and '_'.";
+    private static final String WAR_NAME_REGEX = "^[.A-Za-z0-9_-]+\\.war$";
     private static final String DOMAIN_NAME_REGEX = "^([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$";
 
     private final WebAppOnLinuxDeployModel deployModel;
     private boolean firstTimeCreated = true;
 
     protected WebAppOnLinuxDeployConfiguration(@NotNull Project project, @NotNull ConfigurationFactory factory) {
-        super(project, factory, project.getName());
+        super(project, factory, String.format("%s:%s", factory.getName(), project.getName()));
         deployModel = new WebAppOnLinuxDeployModel();
     }
 
@@ -285,19 +285,19 @@ public class WebAppOnLinuxDeployConfiguration extends RunConfigurationBase {
         deployModel.setAppServicePlanName(appServicePlanName);
     }
 
-    public void setTargetPath(String targetPath) {
-        deployModel.setTargetPath(targetPath);
-    }
-
     public String getTargetPath() {
         return deployModel.getTargetPath();
     }
 
-    public void setTargetName(String targetName) {
-        deployModel.setTargetName(targetName);
+    public void setTargetPath(String targetPath) {
+        deployModel.setTargetPath(targetPath);
     }
 
     public String getTargetName() {
         return deployModel.getTargetName();
+    }
+
+    public void setTargetName(String targetName) {
+        deployModel.setTargetName(targetName);
     }
 }

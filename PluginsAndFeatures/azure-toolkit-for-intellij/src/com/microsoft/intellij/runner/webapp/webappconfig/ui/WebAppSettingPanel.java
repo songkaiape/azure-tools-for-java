@@ -1,18 +1,18 @@
 /*
  * Copyright (c) Microsoft Corporation
- * <p/>
+ *
  * All rights reserved.
- * <p/>
+ *
  * MIT License
- * <p/>
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
  * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
  * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
  * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- * <p/>
+ *
  * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
  * the Software.
- * <p/>
+ *
  * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
  * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package com.microsoft.intellij.ui.webapp.deploysetting;
+package com.microsoft.intellij.runner.webapp.webappconfig.ui;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionToolbarPosition;
@@ -36,36 +36,24 @@ import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.JBTable;
 import com.microsoft.azure.management.appservice.AppServicePlan;
 import com.microsoft.azure.management.appservice.JavaVersion;
+import com.microsoft.azure.management.appservice.OperatingSystem;
 import com.microsoft.azure.management.appservice.PricingTier;
 import com.microsoft.azure.management.appservice.WebApp;
 import com.microsoft.azure.management.resources.Location;
 import com.microsoft.azure.management.resources.ResourceGroup;
 import com.microsoft.azure.management.resources.Subscription;
 import com.microsoft.azuretools.core.mvp.model.ResourceEx;
+import com.microsoft.azuretools.core.mvp.model.webapp.WebAppSettingModel;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.azuretools.utils.AzulZuluModel;
 import com.microsoft.azuretools.utils.WebAppUtils;
 import com.microsoft.intellij.runner.webapp.webappconfig.WebAppConfiguration;
-import com.microsoft.intellij.runner.webapp.webappconfig.WebAppSettingModel;
 import com.microsoft.intellij.util.MavenRunTaskUtil;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.idea.maven.model.MavenConstants;
 import org.jetbrains.idea.maven.project.MavenProject;
-import rx.Observable;
-import rx.schedulers.Schedulers;
 
-import javax.swing.ButtonGroup;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JRadioButton;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.table.DefaultTableModel;
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
@@ -77,31 +65,44 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.swing.ButtonGroup;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.table.DefaultTableModel;
+
+import rx.Observable;
+import rx.schedulers.Schedulers;
+
 public class WebAppSettingPanel implements WebAppDeployMvpView {
 
+    // const
+    private static final String NOT_APPLICABLE = "N/A";
+    private static final String TABLE_LOADING_MESSAGE = "Loading ... ";
+    private static final String TABLE_EMPTY_MESSAGE = "No available Web App.";
+    private static final String DEFAULT_APP_NAME = "webapp-";
+    private static final String DEFAULT_PLAN_NAME = "appsp-";
+    private static final String DEFAULT_RGP_NAME = "rg-webapp-";
     // presenter
     private final WebAppDeployViewPresenter<WebAppSettingPanel> webAppDeployViewPresenter;
-
-    // cache variable
-    private ResourceEx<WebApp> selectedWebApp = null;
     private final Project project;
     private final WebAppConfiguration webAppConfiguration;
+    // cache variable
+    private ResourceEx<WebApp> selectedWebApp = null;
     private List<ResourceEx<WebApp>> cachedWebAppList = null;
-
     private String lastSelectedSid;
+    private String lastSelectedResGrp;
     private String lastSelectedLocation;
     private String lastSelectedPriceTier;
     private Artifact lastSelectedArtifact;
     private boolean isArtifact;
     private WebAppSettingModel.JdkChoice lastJdkChoice = WebAppSettingModel.JdkChoice.DEFAULT;
     private boolean telemetrySent;
-
-    // const
-    private static final String TABLE_LOADING_MESSAGE = "Loading ... ";
-    private static final String TABLE_EMPTY_MESSAGE = "No available Web App.";
-    private static final String DEFAULT_APP_NAME = "webapp-" ;
-    private static final String DEFAULT_PLAN_NAME = "appsp-";
-    private static final String DEFAULT_RGP_NAME = "rg-webapp-";
 
     //widgets
     private JPanel pnlRoot;
@@ -190,6 +191,21 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
             }
         });
 
+        cbExistResGrp.addActionListener(e -> {
+            ResourceGroup resGrp = (ResourceGroup) cbExistResGrp.getSelectedItem();
+            if (resGrp == null) {
+                return;
+            }
+            String selectedGrp = resGrp.name();
+            if (!Comparing.equal(lastSelectedResGrp, selectedGrp)) {
+                cbExistAppServicePlan.removeAllItems();
+                lblLocation.setText(NOT_APPLICABLE);
+                lblPricing.setText(NOT_APPLICABLE);
+                webAppDeployViewPresenter.onLoadAppServicePlan(lastSelectedSid, selectedGrp);
+                lastSelectedResGrp = selectedGrp;
+            }
+        });
+
         cbSubscription.setRenderer(new ListCellRendererWrapper<Subscription>() {
             @Override
             public void customize(JList list, Subscription subscription, int
@@ -207,8 +223,12 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
             }
             String selectedSid = subscription.subscriptionId();
             if (!Comparing.equal(lastSelectedSid, selectedSid)) {
+                cbExistResGrp.removeAllItems();
+                cbLocation.removeAllItems();
+                cbExistAppServicePlan.removeAllItems();
+                lblLocation.setText(NOT_APPLICABLE);
+                lblPricing.setText(NOT_APPLICABLE);
                 webAppDeployViewPresenter.onLoadResourceGroups(selectedSid);
-                webAppDeployViewPresenter.onLoadAppServicePlan(selectedSid);
                 webAppDeployViewPresenter.onLoadLocation(selectedSid);
                 lastSelectedSid = selectedSid;
             }
@@ -303,10 +323,12 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     private void setupArtifactCombo(List<Artifact> artifacts) {
         isCbArtifactInited = false;
         cbArtifact.removeAllItems();
-        for (Artifact artifact: artifacts) {
-            cbArtifact.addItem(artifact);
-            if (Comparing.equal(artifact.getOutputFilePath(), webAppConfiguration.getTargetPath())) {
-                cbArtifact.setSelectedItem(artifact);
+        if (null != artifacts) {
+            for (Artifact artifact: artifacts) {
+                cbArtifact.addItem(artifact);
+                if (Comparing.equal(artifact.getOutputFilePath(), webAppConfiguration.getTargetPath())) {
+                    cbArtifact.setSelectedItem(artifact);
+                }
             }
         }
         cbArtifact.setVisible(true);
@@ -394,11 +416,8 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
         } else {
             MavenProject mavenProject = MavenRunTaskUtil.getMavenProject(project);
             if (mavenProject != null) {
-                String targetPath = new File(mavenProject.getBuildDirectory()).getPath()
-                        + File.separator + mavenProject.getFinalName() + "." + mavenProject.getPackaging();
-                String targetName = mavenProject.getFinalName() + "." + mavenProject.getPackaging();
-                webAppConfiguration.setTargetPath(targetPath);
-                webAppConfiguration.setTargetName(targetName);
+                webAppConfiguration.setTargetPath(MavenRunTaskUtil.getTargetPath(mavenProject));
+                webAppConfiguration.setTargetName(MavenRunTaskUtil.getTargetName(mavenProject));
             }
         }
 
@@ -417,8 +436,7 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
                 webAppConfiguration.setResourceGroup(txtNewResGrp.getText());
             } else {
                 webAppConfiguration.setCreatingResGrp(false);
-                ResourceGroup resourceGroup = (ResourceGroup) cbExistResGrp.getSelectedItem();
-                webAppConfiguration.setResourceGroup(resourceGroup == null ? "" : resourceGroup.name());
+                webAppConfiguration.setResourceGroup(lastSelectedResGrp == null ? "" : lastSelectedResGrp);
             }
             // app service plan
             if (rdoCreateAppServicePlan.isSelected()) {
@@ -569,7 +587,11 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillSubscription(List<Subscription> subscriptions) {
         cbSubscription.removeAllItems();
-        for (Subscription subscription: subscriptions) {
+        if (subscriptions.size() == 0) {
+            lastSelectedSid = null;
+            return;
+        }
+        for (Subscription subscription : subscriptions) {
             cbSubscription.addItem(subscription);
             if (Comparing.equal(subscription.subscriptionId(), webAppConfiguration.getSubscriptionId())) {
                 cbSubscription.setSelectedItem(subscription);
@@ -580,6 +602,10 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillResourceGroup(List<ResourceGroup> resourceGroups) {
         cbExistResGrp.removeAllItems();
+        if (resourceGroups.size() == 0) {
+            lastSelectedResGrp = null;
+            return;
+        }
         resourceGroups.stream()
                 .sorted(Comparator.comparing(ResourceGroup::name))
                 .forEach((group) -> {
@@ -593,7 +619,13 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillAppServicePlan(List<AppServicePlan> appServicePlans) {
         cbExistAppServicePlan.removeAllItems();
+        if (appServicePlans.size() == 0) {
+            lblLocation.setText(NOT_APPLICABLE);
+            lblPricing.setText(NOT_APPLICABLE);
+            return;
+        }
         appServicePlans.stream()
+                .filter(item -> Comparing.equal(item.operatingSystem(), OperatingSystem.WINDOWS))
                 .sorted(Comparator.comparing(AppServicePlan::name))
                 .forEach((plan) -> {
                     cbExistAppServicePlan.addItem(plan);
@@ -606,6 +638,10 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillLocation(List<Location> locations) {
         cbLocation.removeAllItems();
+        if (locations.size() == 0) {
+            lastSelectedLocation = null;
+            return;
+        }
         locations.stream()
                 .sorted(Comparator.comparing(Location::displayName))
                 .forEach((location) -> {
@@ -619,7 +655,7 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillPricingTier(List<PricingTier> prices) {
         cbPricing.removeAllItems();
-        for (PricingTier price: prices) {
+        for (PricingTier price : prices) {
             cbPricing.addItem(price);
             if (Comparing.equal(price.toString(), webAppConfiguration.getPricing())) {
                 cbPricing.setSelectedItem(price);
@@ -630,7 +666,7 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillWebContainer(List<WebAppUtils.WebContainerMod> webContainers) {
         cbWebContainer.removeAllItems();
-        for (WebAppUtils.WebContainerMod container: webContainers) {
+        for (WebAppUtils.WebContainerMod container : webContainers) {
             cbWebContainer.addItem(container);
             if (Comparing.equal(container.getValue(), webAppConfiguration.getWebContainer())) {
                 cbWebContainer.setSelectedItem(container);
@@ -641,12 +677,20 @@ public class WebAppSettingPanel implements WebAppDeployMvpView {
     @Override
     public void fillThirdPartyJdk(List<AzulZuluModel> jdks) {
         cbThirdPartyJdk.removeAllItems();
-        for (AzulZuluModel jdk: jdks) {
+        for (AzulZuluModel jdk : jdks) {
             cbThirdPartyJdk.addItem(jdk);
             if (Comparing.equal(jdk.getDownloadUrl(), webAppConfiguration.getJdkUrl())) {
                 cbThirdPartyJdk.setSelectedItem(jdk);
             }
         }
+    }
+
+    /**
+     * Let the presenter release the view. Will be called by:
+     * {@link com.microsoft.intellij.runner.webapp.webappconfig.WebAppSettingEditor#disposeEditor()}.
+     */
+    public void disposeEditor() {
+        webAppDeployViewPresenter.onDetachView();
     }
 
     // TODO: refactor later

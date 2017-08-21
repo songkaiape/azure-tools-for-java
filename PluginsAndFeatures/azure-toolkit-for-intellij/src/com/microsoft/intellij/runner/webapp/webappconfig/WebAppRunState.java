@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) Microsoft Corporation
  * <p/>
  * All rights reserved.
@@ -35,17 +35,18 @@ import com.microsoft.azure.management.appservice.WebApp;
 import com.microsoft.azure.management.resources.ResourceGroup;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
+import com.microsoft.azuretools.core.mvp.model.webapp.WebAppSettingModel;
 import com.microsoft.azuretools.core.mvp.ui.base.SchedulerProviderFactory;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.azuretools.utils.AzureUIRefreshCore;
 import com.microsoft.azuretools.utils.AzureUIRefreshEvent;
 import com.microsoft.azuretools.utils.WebAppUtils;
 import com.microsoft.intellij.runner.RunProcessHandler;
+
 import org.apache.commons.net.ftp.FTPClient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.idea.maven.model.MavenConstants;
-import rx.Observable;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -54,10 +55,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class WebAppRunState implements RunProfileState {
+import rx.Observable;
 
-    private final Project project;
-    private final WebAppSettingModel webAppSettingModel;
+public class WebAppRunState implements RunProfileState {
 
     private static final String GETTING_DEPLOYMENT_CREDENTIAL = "Getting Deployment Credential...";
     private static final String CONNECTING_FTP = "Connecting to FTP server...";
@@ -69,10 +69,11 @@ public class WebAppRunState implements RunProfileState {
     private static final String NO_WEBAPP = "Cannot get webapp for deploy";
     private static final String NO_TARGETFILE = "Cannot find target file: %s";
     private static final String FAIL_FTPSTORE = "FTP client can't store the artifact, reply code: %s";
-
     private static final String BASE_PATH = "/site/wwwroot/webapps/";
     private static final String ROOT_PATH = BASE_PATH + "ROOT";
     private static final String ROOT_FILE_PATH = ROOT_PATH + "." + MavenConstants.TYPE_WAR;
+    private final Project project;
+    private final WebAppSettingModel webAppSettingModel;
 
     public WebAppRunState(Project project, WebAppSettingModel webAppSettingModel) {
         this.project = project;
@@ -146,9 +147,8 @@ public class WebAppRunState implements RunProfileState {
             processHandler.setText(DEPLOY_SUCCESSFUL);
             processHandler.setText("URL: " + url);
             return webApp;
-        })
-                .subscribeOn(SchedulerProviderFactory.getInstance().getSchedulerProvider().io())
-                .subscribe(webApp -> {
+        }).subscribeOn(SchedulerProviderFactory.getInstance().getSchedulerProvider().io()).subscribe(
+                webApp -> {
                     processHandler.notifyComplete();
                     if (webAppSettingModel.isCreatingNew() && AzureUIRefreshCore.listeners != null) {
                         try {
@@ -156,11 +156,7 @@ public class WebAppRunState implements RunProfileState {
                                     .getResourceGroupBySubscriptionIdAndName(webAppSettingModel.getSubscriptionId(),
                                             webAppSettingModel.getResourceGroup());
                             AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH,
-                                    new WebAppUtils.WebAppDetails(resourceGroup, webApp,
-                                            null /*appServicePlan*/,
-                                            null /*appServicePlanResourceGroup*/,
-                                            null /*subscriptionDetail*/
-                                    )));
+                                    null));
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -172,7 +168,8 @@ public class WebAppRunState implements RunProfileState {
                     processHandler.setText(err.getMessage());
                     processHandler.notifyComplete();
                     sendTelemetry(false, err.getMessage());
-                });
+                }
+        );
         return new DefaultExecutionResult(consoleView, processHandler);
     }
 
@@ -185,7 +182,7 @@ public class WebAppRunState implements RunProfileState {
     }
 
     // TODO: refactor later
-    private void sendTelemetry(boolean success, @Nullable String ErrorMsg) {
+    private void sendTelemetry(boolean success, @Nullable String errorMsg) {
         Map<String, String> map = new HashMap<>();
         map.put("SubscriptionId", webAppSettingModel.getSubscriptionId());
         map.put("CreateNewApp", String.valueOf(webAppSettingModel.isCreatingNew()));
@@ -193,7 +190,7 @@ public class WebAppRunState implements RunProfileState {
         map.put("CreateNewRGP", String.valueOf(webAppSettingModel.isCreatingResGrp()));
         map.put("Success", String.valueOf(success));
         if (!success) {
-            map.put("ErrorMsg", ErrorMsg);
+            map.put("ErrorMsg", errorMsg);
         }
 
         AppInsightsClient.createByType(AppInsightsClient.EventType.Action, "Webapp", "Deploy", map);

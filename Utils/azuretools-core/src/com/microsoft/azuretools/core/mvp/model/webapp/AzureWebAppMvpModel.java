@@ -25,13 +25,16 @@ package com.microsoft.azuretools.core.mvp.model.webapp;
 
 import com.microsoft.azure.management.Azure;
 import com.microsoft.azure.management.appservice.AppServicePlan;
+import com.microsoft.azure.management.appservice.JavaVersion;
 import com.microsoft.azure.management.appservice.OperatingSystem;
 import com.microsoft.azure.management.appservice.PricingTier;
 import com.microsoft.azure.management.appservice.WebApp;
+import com.microsoft.azure.management.appservice.WebContainer;
 import com.microsoft.azure.management.appservice.implementation.SiteInner;
 import com.microsoft.azure.management.resources.Subscription;
 import com.microsoft.azure.management.resources.fluentcore.arm.Region;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
+import com.microsoft.azuretools.azurecommons.helpers.NotNull;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.sdkmanage.AzureManager;
@@ -47,8 +50,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AzureWebAppMvpModel {
-    private static final String NOT_SIGNED_ERROR = "Plugin not signed in error.";
-    private static final String CANNOT_GET_AZURE_BY_SID = "Cannot get Azure by subscription ID.";
     private final Map<String, List<ResourceEx<WebApp>>> subscriptionIdToWebAppsMap;
     private final Map<String, List<ResourceEx<SiteInner>>> subscriptionIdToWebAppsOnLinuxMap;
 
@@ -61,17 +62,96 @@ public class AzureWebAppMvpModel {
         return SingletonHolder.INSTANCE;
     }
 
+    private static WebApp.DefinitionStages.WithCreate withCreateNewSPlan(
+            @NotNull Azure azure,
+            @NotNull WebAppSettingModel model) throws Exception {
+        String[] tierSize = model.getPricing().split("_");
+        if (tierSize.length != 2) {
+            throw new Exception("Cannot get valid price tier");
+        }
+        PricingTier pricing = new PricingTier(tierSize[0], tierSize[1]);
+        AppServicePlan.DefinitionStages.WithCreate withCreatePlan;
+
+        WebApp.DefinitionStages.WithCreate withCreateWebApp;
+        if (model.isCreatingResGrp()) {
+            withCreatePlan = azure.appServices().appServicePlans()
+                    .define(model.getAppServicePlanName())
+                    .withRegion(model.getRegion())
+                    .withNewResourceGroup(model.getResourceGroup())
+                    .withPricingTier(pricing)
+                    .withOperatingSystem(OperatingSystem.WINDOWS);
+            withCreateWebApp = azure.webApps().define(model.getWebAppName())
+                    .withRegion(model.getRegion())
+                    .withNewResourceGroup(model.getResourceGroup())
+                    .withNewWindowsPlan(withCreatePlan);
+        } else {
+            withCreatePlan = azure.appServices().appServicePlans()
+                    .define(model.getAppServicePlanName())
+                    .withRegion(model.getRegion())
+                    .withExistingResourceGroup(model.getResourceGroup())
+                    .withPricingTier(pricing)
+                    .withOperatingSystem(OperatingSystem.WINDOWS);
+            withCreateWebApp = azure.webApps().define(model.getWebAppName())
+                    .withRegion(model.getRegion())
+                    .withExistingResourceGroup(model.getResourceGroup())
+                    .withNewWindowsPlan(withCreatePlan);
+        }
+        return withCreateWebApp;
+    }
+
+    private static WebApp.DefinitionStages.WithCreate withCreateExistingSPlan(
+            @NotNull Azure azure,
+            @NotNull WebAppSettingModel model) {
+        AppServicePlan servicePlan = azure.appServices().appServicePlans().getById(model.getAppServicePlanId());
+        WebApp.DefinitionStages.WithCreate withCreate;
+        if (model.isCreatingResGrp()) {
+            withCreate = azure.webApps().define(model.getWebAppName())
+                    .withExistingWindowsPlan(servicePlan)
+                    .withNewResourceGroup(model.getResourceGroup());
+        } else {
+            withCreate = azure.webApps().define(model.getWebAppName())
+                    .withExistingWindowsPlan(servicePlan)
+                    .withExistingResourceGroup(model.getResourceGroup());
+        }
+
+        return withCreate;
+    }
+
     public WebApp getWebAppById(String sid, String id) throws IOException {
-        Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(sid);
+        Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
         return azure.webApps().getById(id);
     }
 
-    public void createWebApp() {
-        // TODO
+    // TODO
+    public WebApp createWebApp(@NotNull WebAppSettingModel model) throws Exception {
+        Azure azure = AuthMethodManager.getInstance().getAzureClient(model.getSubscriptionId());
+
+        WebApp.DefinitionStages.WithCreate withCreate;
+        if (model.isCreatingAppServicePlan()) {
+            withCreate = withCreateNewSPlan(azure, model);
+        } else {
+            withCreate = withCreateExistingSPlan(azure, model);
+        }
+
+        WebApp webApp;
+        if (WebAppSettingModel.JdkChoice.DEFAULT.toString().equals(model.getJdkChoice())) {
+            webApp = withCreate
+                    .withJavaVersion(JavaVersion.JAVA_8_NEWEST)
+                    .withWebContainer(WebContainer.fromString(model.getWebContainer()))
+                    .create();
+        } else {
+            webApp = withCreate.create();
+        }
+        return webApp;
     }
 
     public void deployWebApp() {
         // TODO
+    }
+
+    public void deleteWebApp(String sid, String appid) throws IOException {
+        AuthMethodManager.getInstance().getAzureClient(sid).webApps().deleteById(appid);
+        // TODO: update cache
     }
 
     /**
@@ -91,9 +171,8 @@ public class AzureWebAppMvpModel {
         }
         PrivateRegistryImageSetting pr = (PrivateRegistryImageSetting) imageSetting;
         WebApp app;
-        Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(sid);
+        Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
         PricingTier pricingTier = new PricingTier(profile.getPricingSkuTier(), profile.getPricingSkuSize());
-
 
         WebApp.DefinitionStages.Blank webAppDefinition = azure.webApps().define(profile.getWebAppName());
         if (profile.isCreatingNewAppServicePlan()) {
@@ -152,6 +231,7 @@ public class AzureWebAppMvpModel {
             }
         }
         return app;
+        // TODO: update cache
     }
 
     /**
@@ -175,48 +255,37 @@ public class AzureWebAppMvpModel {
         return app;
     }
 
+    public void deleteWebAppOnLinux(String sid, String appid) throws IOException {
+        deleteWebApp(sid, appid);
+    }
+
+    public void restartWebApp(String sid, String appid) throws IOException {
+        AuthMethodManager.getInstance().getAzureClient(sid).webApps().getById(appid).restart();
+    }
+
+    public void startWebApp(String sid, String appid) throws IOException {
+        AuthMethodManager.getInstance().getAzureClient(sid).webApps().getById(appid).start();
+    }
+
+    public void stopWebApp(String sid, String appid) throws IOException {
+        AuthMethodManager.getInstance().getAzureClient(sid).webApps().getById(appid).stop();
+    }
+
     /**
      * List app service plan by subscription id and resource group name.
      */
     public List<AppServicePlan> listAppServicePlanBySubscriptionIdAndResourceGroupName(String sid, String group)
-            throws Exception {
-        List<AppServicePlan> list;
-        try {
-            AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
-            if (azureManager == null) {
-                throw new Exception(NOT_SIGNED_ERROR);
-            }
-            Azure azure = azureManager.getAzure(sid);
-            if (azure == null) {
-                throw new Exception(CANNOT_GET_AZURE_BY_SID);
-            }
-            list = azure.appServices().appServicePlans().listByResourceGroup(group);
-        } catch (Exception e) {
-            throw new Exception(CANNOT_GET_AZURE_BY_SID);
-        }
-        return list;
+            throws IOException {
+        return AuthMethodManager.getInstance().getAzureClient(sid)
+                .appServices().appServicePlans().listByResourceGroup(group);
     }
 
 
     /**
      * List app service plan by subscription id.
      */
-    public List<AppServicePlan> listAppServicePlanBySubscriptionId(String sid) throws Exception {
-        List<AppServicePlan> list;
-        try {
-            AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
-            if (azureManager == null) {
-                throw new Exception(NOT_SIGNED_ERROR);
-            }
-            Azure azure = azureManager.getAzure(sid);
-            if (azure == null) {
-                throw new Exception(CANNOT_GET_AZURE_BY_SID);
-            }
-            list = azure.appServices().appServicePlans().list();
-        } catch (Exception e) {
-            throw new Exception(CANNOT_GET_AZURE_BY_SID);
-        }
-        return list;
+    public List<AppServicePlan> listAppServicePlanBySubscriptionId(String sid) throws IOException {
+        return AuthMethodManager.getInstance().getAzureClient(sid).appServices().appServicePlans().list();
     }
 
     /**
@@ -228,7 +297,7 @@ public class AzureWebAppMvpModel {
         }
         List<ResourceEx<WebApp>> webAppList = new ArrayList<>();
         try {
-            Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(sid);
+            Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
             for (WebApp webApp : azure.webApps().list()) {
                 if (webApp.operatingSystem().equals(OperatingSystem.WINDOWS)) {
                     webAppList.add(new ResourceEx<>(webApp, sid));
@@ -266,7 +335,7 @@ public class AzureWebAppMvpModel {
             return subscriptionIdToWebAppsOnLinuxMap.get(sid);
         }
         try {
-            Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(sid);
+            Azure azure = AuthMethodManager.getInstance().getAzureClient(sid);
             wal.addAll(azure.webApps().inner().list()
                     .stream()
                     .filter(app -> app.kind().equals("app,linux"))

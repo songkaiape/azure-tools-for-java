@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-package com.microsoft.intellij.ui.webapp.deploysetting;
+package com.microsoft.intellij.runner.webapp.webappconfig.ui;
 
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
@@ -77,8 +77,9 @@ public class WebAppDeployViewPresenter<V extends WebAppDeployMvpView> extends Mv
     /**
      * Load app service plan from model.
      */
-    public void onLoadAppServicePlan(String sid) {
-        Observable.fromCallable(() -> AzureWebAppMvpModel.getInstance().listAppServicePlanBySubscriptionId(sid))
+    public void onLoadAppServicePlan(String sid, String group) {
+        Observable.fromCallable(() -> AzureWebAppMvpModel.getInstance()
+                .listAppServicePlanBySubscriptionIdAndResourceGroupName(sid, group))
                 .subscribeOn(getSchedulerProvider().io())
                 .subscribe(appServicePlans -> DefaultLoader.getIdeHelper().invokeLater(() -> {
                     if (isViewDetached()) {

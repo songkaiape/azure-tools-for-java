@@ -52,7 +52,6 @@ import org.jetbrains.idea.maven.model.MavenConstants;
 import org.jetbrains.idea.maven.project.MavenProject;
 
 import java.awt.event.ItemEvent;
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
@@ -93,8 +92,8 @@ public class SettingPanel implements WebAppOnLinuxDeployView {
     private JTextField textUsername;
     private JPasswordField passwordField;
     private JTextField textAppName;
-    private JComboBox comboSubscription;
-    private JComboBox comboResourceGroup;
+    private JComboBox<Subscription> comboSubscription;
+    private JComboBox<ResourceGroup> comboResourceGroup;
     private JTextField textImageTag;
     private JTextField textStartupFile;
     private JPanel pnlUpdate;
@@ -103,15 +102,15 @@ public class SettingPanel implements WebAppOnLinuxDeployView {
     private JRadioButton rdoUseExist;
     private JRadioButton rdoCreateNew;
     private JPanel pnlCreate;
-    private JComboBox cbLocation;
-    private JComboBox cbPricing;
+    private JComboBox<Location> cbLocation;
+    private JComboBox<PricingTier> cbPricing;
     private JRadioButton rdoCreateResGrp;
     private JTextField txtNewResGrp;
     private JRadioButton rdoUseExistResGrp;
     private JRadioButton rdoCreateAppServicePlan;
     private JTextField txtCreateAppServicePlan;
     private JRadioButton rdoUseExistAppServicePlan;
-    private JComboBox cbExistAppServicePlan;
+    private JComboBox<AppServicePlan> cbExistAppServicePlan;
     private JLabel lblLocation;
     private JLabel lblPricing;
     private JPanel pnlAcr;
@@ -262,12 +261,8 @@ public class SettingPanel implements WebAppOnLinuxDeployView {
                     "Open", map);
             return true;
         }).subscribeOn(Schedulers.io()).subscribe(
-                (res) -> {
-                    telemetrySent = true;
-                },
-                (err) -> {
-                    telemetrySent = true;
-                }
+                (res) -> telemetrySent = true,
+                (err) -> telemetrySent = true
         );
     }
 
@@ -346,12 +341,8 @@ public class SettingPanel implements WebAppOnLinuxDeployView {
         } else {
             MavenProject mavenProject = MavenRunTaskUtil.getMavenProject(project);
             if (mavenProject != null) {
-                // TODO: move to a util
-                String targetPath = new File(mavenProject.getBuildDirectory()).getPath()
-                        + File.separator + mavenProject.getFinalName() + "." + mavenProject.getPackaging();
-                String targetName = mavenProject.getFinalName() + "." + mavenProject.getPackaging();
-                webAppOnLinuxDeployConfiguration.setTargetPath(targetPath);
-                webAppOnLinuxDeployConfiguration.setTargetName(targetName);
+                webAppOnLinuxDeployConfiguration.setTargetPath(MavenRunTaskUtil.getTargetPath(mavenProject));
+                webAppOnLinuxDeployConfiguration.setTargetName(MavenRunTaskUtil.getTargetName(mavenProject));
             }
         }
 
@@ -682,6 +673,14 @@ public class SettingPanel implements WebAppOnLinuxDeployView {
             });
         }
 
+    }
+
+    /**
+     * Let the presenter release the view. Will be called by:
+     * {@link com.microsoft.intellij.runner.container.webapponlinux.WebAppOnLinuxDeploySettingsEditor#disposeEditor()}.
+     */
+    public void disposeEditor() {
+        webAppOnLinuxDeployPresenter.onDetachView();
     }
 
 

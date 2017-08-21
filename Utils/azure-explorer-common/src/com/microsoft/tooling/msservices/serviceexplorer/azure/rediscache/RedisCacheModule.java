@@ -41,7 +41,7 @@ public class RedisCacheModule extends AzureRefreshableNode {
      */
     public RedisCacheModule(Node parent) {
         super(REDIS_SERVICE_MODULE_ID, BASE_MODULE_NAME, parent, ICON_PATH);
-        redisCachePresenter = new RedisCacheModulePresenter<RedisCacheModule>();
+        redisCachePresenter = new RedisCacheModulePresenter<>();
         redisCachePresenter.onAttachView(RedisCacheModule.this);
     }
 
