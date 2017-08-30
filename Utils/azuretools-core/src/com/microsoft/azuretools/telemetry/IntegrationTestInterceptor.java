@@ -13,7 +13,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -22,111 +21,100 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.IOUtils;
-
-import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class IntegrationTestInterceptor implements Interceptor {
 
-    private static final String Record_Folder = "records/";
-    private static final String Record_File = "record";
-    private static final String Record_Path = "c:/";
-    Date date=new Date();
-    DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
-    String Record_FilePath=Record_Path + Record_Folder+dateFormat.format(date)+".json";
-    //private static final String Record_FilePath = Record_Path + Record_Folder + Record_File + ".json";
-    static final String StatusCode = "StatusCode";
-    static final String Body = "Body";
+	private static final String Record_Folder = "records/";
+	static SimpleDateFormat dateformat=new SimpleDateFormat("yyyy-MM-dd-HH-mm");
+	
+	private static final String Record_File = dateformat.format(new Date());
+	private static final String Record_Path = "c:/";
+	private static final String Record_FilePath = Record_Path + Record_Folder + Record_File + ".json";
+	static final String StatusCode = "StatusCode";
+	static final String Body = "Body";
 
-    private static final String GLOBAL_ENDPOINT = "https://management.azure.com";
-    protected final static String MOCK_SUBSCRIPTION = "00000000-0000-0000-0000-000000000000";
-    private static final String MOCK_HOST = "localhost";
-    private static final String MOCK_PORT = String.format("3%03d", (int) (Math.random() * Math.random() * 1000));
-    private static final String MOCK_URI = "http://" + MOCK_HOST + ":" + MOCK_PORT;
-    private TestRecord testrecord = new TestRecord();
+	private static final String GLOBAL_ENDPOINT = "https://management.azure.com";
+	protected final static String MOCK_SUBSCRIPTION = "00000000-0000-0000-0000-000000000000";
+	private static final String MOCK_HOST = "localhost";
+	private static final String MOCK_PORT = String.format("3%03d", (int) (Math.random() * Math.random() * 1000));
+	private static final String MOCK_URI = "http://" + MOCK_HOST + ":" + MOCK_PORT;
+	private TestRecord testrecord = new TestRecord();
 
-    @Override
-    public Response intercept(Chain chain) throws IOException {
-        final Request request = chain.request();
-        
-        File recordFile = new File(Record_FilePath);
-        if (!recordFile.exists()) {
-            File folderFile = new File(Record_Path + Record_Folder);
-            if (!folderFile.exists())
-                folderFile.mkdir();
-            recordFile.createNewFile();
+	@Override
+	public Response intercept(Chain chain) throws IOException {
+		final Request request = chain.request();
 
-        }
+		File recordFile = new File(Record_FilePath);
+		if (!recordFile.exists()) {
+			File folderFile = new File(Record_Path + Record_Folder);
+			if (!folderFile.exists())
+				folderFile.mkdir();
+			recordFile.createNewFile();
 
-        NetworkCallRecord record = new NetworkCallRecord();
-        
-        
-        synchronized (this) {
+		}
 
-            record.Method = request.method();
+		NetworkCallRecord record = new NetworkCallRecord();
+		synchronized (this) {
+			if (!request.headers().get("x-ms-logging-context").contains("poll")) {
+				record.Method = request.method();
+				record.Uri = replaceUrl(request.url().toString());
+				record.Headers = new HashMap<String, String>();
+				getHeader(request.headers(), record.Headers);
 
-            record.Uri = replaceUrl(request.url().toString());
-            record.Headers = new HashMap<String, String>();
-            getHeader(request.headers(), record.Headers);
+				final Response response = chain.proceed(request);
+				ResponseBody responseBody = response.body();
+				BufferedSource responseBuffer = responseBody.source();
+				responseBuffer.request(9223372036854775807L);
+				Buffer buffer = responseBuffer.buffer().clone();
+				String responseBodyString = null;
 
-            final Response response = chain.proceed(request);
-            ResponseBody responseBody = response.body();
-            BufferedSource responseBuffer = responseBody.source();
-            responseBuffer.request(9223372036854775807L);
-            Buffer buffer = responseBuffer.buffer().clone();
-            String responseBodyString = null;
-            
-            if (response.header("Content-Encoding") == null) {
-                responseBodyString = new String(buffer.readString(Util.UTF_8));
-            } else if (response.header("Content-Encoding").equalsIgnoreCase("gzip")) {
-                GZIPInputStream gis = new GZIPInputStream(buffer.inputStream());
-                responseBodyString = IOUtils.toString(gis);
-            }
+				if (response.header("Content-Encoding") == null) {
+					responseBodyString = new String(buffer.readString(Util.UTF_8));
+				} else if (response.header("Content-Encoding").equalsIgnoreCase("gzip")) {
+					GZIPInputStream gis = new GZIPInputStream(buffer.inputStream());
+					responseBodyString = IOUtils.toString(gis);
+				}
 
-            record.Response = new HashMap<String, String>();
-            record.Response.put(Body, replaceUrl(responseBodyString));
-            record.Response.put(StatusCode, Integer.toString(response.code()));
-            
-            getHeader(response.headers(), record.Response);
-            boolean isPoll=record.Response.get("Body").contains("Creating")&&record.Headers.get("x-ms-logging-context").contains("poll");
-            if (!isPoll)
-            {
-       
-                testrecord.networkCallRecords.add(record);
-            }
-            
-            ObjectMapper mapper = new ObjectMapper();
-            
-            try {
+				record.Response = new HashMap<String, String>();
+				record.Response.put(Body, replaceUrl(responseBodyString));
+				record.Response.put(StatusCode, Integer.toString(response.code()));
+				getHeader(response.headers(), record.Response);
+				testrecord.networkCallRecords.add(record);
+				ObjectMapper mapper = new ObjectMapper();
 
-                FileOutputStream out = new FileOutputStream(Record_FilePath);
-                mapper.writeValue(out, testrecord);
+				try {
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+					FileOutputStream out = new FileOutputStream(Record_FilePath);
+					mapper.writeValue(out, testrecord);
 
-            Response newResponse = response.newBuilder()
-                    .body(ResponseBody.create(responseBody.contentType(), responseBodyString.getBytes())).build();
-            return newResponse;
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 
-        }
-    }
+				Response newResponse = response.newBuilder()
+						.body(ResponseBody.create(responseBody.contentType(), responseBodyString.getBytes())).build();
+				return newResponse;
+			} else {
+				return chain.proceed(request);
+			}
+		}
+	}
 
-    public void getHeader(Headers h, Map<String, String> m) {
-        Set<String> headerKeys = h.names();
-        for (String s : headerKeys) {
-            m.put(s, replaceUrl(h.get(s)));
-        }
+	public void getHeader(Headers h, Map<String, String> m) {
+		Set<String> headerKeys = h.names();
+		for (String s : headerKeys) {
+			m.put(s, h.get(s));
+		}
 
-    }
+	}
 
-    public String replaceUrl(String url) {
-        String regex = "(?<=subscriptions\\/).+?(?=\\/)";
-        url = url.replaceAll(regex, MOCK_SUBSCRIPTION);
-        url = url.replaceAll(GLOBAL_ENDPOINT, MOCK_URI);
-        return url;
+	public String replaceUrl(String url) {
+		String regex = "(?<=subscriptions\\/).+?(?=\\/)";
+		url = url.replaceAll(regex, MOCK_SUBSCRIPTION);
+		url = url.replaceAll(GLOBAL_ENDPOINT, MOCK_URI);
+		return url;
 
-    }
+	}
 
 }
