@@ -22,27 +22,33 @@
 
 package com.microsoft.azuretools.azureexplorer.editors.container;
 
+import com.microsoft.azuretools.azurecommons.helpers.NotNull;
 import com.microsoft.azuretools.azurecommons.util.Utils;
+import com.microsoft.azuretools.core.components.AzureListenerWrapper;
 import com.microsoft.azuretools.core.mvp.ui.containerregistry.ContainerRegistryProperty;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.container.ContainerRegistryPropertyMvpView;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.container.ContainerRegistryPropertyViewPresenter;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
 import org.eclipse.swt.custom.ScrolledComposite;
-import org.eclipse.swt.events.SelectionAdapter;
-import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Link;
+import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.ToolBar;
+import org.eclipse.swt.widgets.ToolItem;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorSite;
+import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchListener;
 import org.eclipse.ui.IWorkbenchPage;
@@ -50,17 +56,17 @@ import org.eclipse.ui.PartInitException;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.EditorPart;
 
+import java.util.Collections;
 import java.util.List;
 
 public class ContainerRegistryExplorerEditor extends EditorPart implements ContainerRegistryPropertyMvpView {
 
+
+    private static final String INSIGHT_NAME = "AzurePlugin.Eclipse.Editor.ContainerRegistryExplorerEditor";
+
     public static final String ID = "com.microsoft.azuretools.azureexplorer.editors.container.ContainerRegistryExplorerEditor";
 
     private final ContainerRegistryPropertyViewPresenter<ContainerRegistryExplorerEditor> containerExplorerPresenter;
-
-    private static final int VERTICAL_SPACING = 10;
-    private static final int HORIZONTAL_SPACING = 30;
-    private static final int COLUMN_NUM = 2;
 
     private static final String LABEL_NAME = "Registry Name";
     private static final String LABEL_TYPE = "Type";
@@ -72,15 +78,26 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
     private static final String LABEL_USER_NAME = "User Name";
     private static final String LABEL_PASSWORD = "Password";
     private static final String LABEL_PASSWORD2 = "Password2";
+    private static final String LABEL_TAG = "Tag";
+    private static final String LABEL_REPOSITORY = "Repository";
+    private static final String TLTM_NEXT_PAGE = "Next page";
+    private static final String TLTM_PREVIOUS_PAGE = "Previous page";
+    private static final String TLTM_REFRESH = "Refresh";
+    private static final String BTN_DISABLE = "Disable";
+    private static final String BTN_ENABLE = "Enable";
     private static final String LOADING = "<Loading...>";
     private static final String COPY_TO_CLIPBOARD = "<a>Copy to Clipboard</a>";
+
+    private static final int PROGRESS_BAR_HEIGHT = 3;
 
     private String password = "";
     private String password2 = "";
     private String registryId;
+    private String subscriptionId;
+    private String currentRepo;
 
     private ScrolledComposite scrolledComposite;
-    private Composite container;
+    private Composite panelHolder;
     private Text txtRegistryName;
     private Text txtType;
     private Text txtResGrp;
@@ -99,7 +116,23 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
 
     private boolean isAdminEnabled;
 
-    private String subscriptionId;
+    private SashForm sashForm;
+    private Composite cmpoRepo;
+    private Composite cmpoTag;
+    private ToolBar repoToolBar;
+    private ToolItem tltmRefreshRepo;
+    private ToolItem tltmRepoPreviousPage;
+    private ToolItem tltmRepoNextPage;
+    private org.eclipse.swt.widgets.List lstRepo;
+    private Label label;
+    private Label lblTag;
+    private org.eclipse.swt.widgets.List lstTag;
+    private ToolBar tagToolBar;
+    private ToolItem tltmRefreshTag;
+    private ToolItem tltmTagPreviousPage;
+    private ToolItem tltmTagNextPage;
+    private Composite container;
+    private ProgressBar progressBar;
 
     public ContainerRegistryExplorerEditor() {
         this.containerExplorerPresenter = new ContainerRegistryPropertyViewPresenter<ContainerRegistryExplorerEditor>();
@@ -113,11 +146,30 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         scrolledComposite.setExpandHorizontal(true);
         scrolledComposite.setExpandVertical(true);
 
-        container = new Composite(scrolledComposite, SWT.NONE);
-        GridLayout grdiLayout = new GridLayout(COLUMN_NUM, false);
-        grdiLayout.verticalSpacing = VERTICAL_SPACING;
-        grdiLayout.horizontalSpacing = HORIZONTAL_SPACING;
-        container.setLayout(grdiLayout);
+        panelHolder = new Composite(scrolledComposite, SWT.NONE);
+        GridLayout glPanelHolder = new GridLayout(1, false);
+        glPanelHolder.marginWidth = 0;
+        glPanelHolder.marginHeight = 0;
+        glPanelHolder.verticalSpacing = 0;
+        glPanelHolder.horizontalSpacing = 0;
+        panelHolder.setLayout(glPanelHolder);
+
+        setScrolledCompositeContent();
+        setChildrenTransparent(panelHolder);
+
+        progressBar = new ProgressBar(panelHolder, SWT.HORIZONTAL | SWT.INDETERMINATE);
+        GridData gdProgressBar = new GridData(SWT.FILL, SWT.TOP, false, false, 1, 1);
+        gdProgressBar.heightHint = PROGRESS_BAR_HEIGHT;
+        progressBar.setLayoutData(gdProgressBar);
+
+        container = new Composite(panelHolder, SWT.NONE);
+        container.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+        GridLayout glContainer = new GridLayout(4, false);
+        glContainer.marginHeight = 2;
+        glContainer.marginWidth = 0;
+        glContainer.horizontalSpacing = 30;
+        glContainer.verticalSpacing = 10;
+        container.setLayout(glContainer);
 
         Label lblRegistryName = new Label(container, SWT.NONE);
         lblRegistryName.setText(LABEL_NAME);
@@ -125,41 +177,11 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         txtRegistryName = new Text(container, SWT.READ_ONLY);
         txtRegistryName.setText(LOADING);
 
-        Label lblType = new Label(container, SWT.NONE);
-        lblType.setText(LABEL_TYPE);
-
-        txtType = new Text(container, SWT.READ_ONLY);
-        txtType.setText(LOADING);
-
-        Label lblResourceGroup = new Label(container, SWT.NONE);
-        lblResourceGroup.setText(LABEL_RES_GRP);
-
-        txtResGrp = new Text(container, SWT.READ_ONLY);
-        txtResGrp.setText(LOADING);
-
-        Label lblSubscriptionId = new Label(container, SWT.NONE);
-        lblSubscriptionId.setText(LABEL_SUBSCRIPTION);
-
-        txtSubscriptionId = new Text(container, SWT.READ_ONLY);
-        txtSubscriptionId.setText(LOADING);
-
-        Label lblRegion = new Label(container, SWT.NONE);
-        lblRegion.setText(LABEL_REGION);
-
-        txtRegion = new Text(container, SWT.READ_ONLY);
-        txtRegion.setText(LOADING);
-
-        Label lblLoginServerUrl = new Label(container, SWT.NONE);
-        lblLoginServerUrl.setText(LABEL_LOGIN_SERVER_URL);
-
-        txtLoginServerUrl = new Text(container, SWT.READ_ONLY);
-        txtLoginServerUrl.setText(LOADING);
-
         Label lblAdminUserEnabled = new Label(container, SWT.NONE);
         lblAdminUserEnabled.setText(LABEL_ADMIN_USER_ENABLED);
 
         compAdminUserBtn = new Composite(container, SWT.NONE);
-        compAdminUserBtn.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
+        compAdminUserBtn.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
         GridLayout compositeLayout = new GridLayout(2, true);
         compositeLayout.marginWidth = 0;
         compositeLayout.marginHeight = 0;
@@ -170,12 +192,18 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         btnEnable = new Button(compAdminUserBtn, SWT.NONE);
         btnEnable.setEnabled(false);
         btnEnable.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
-        btnEnable.setText("Enable");
+        btnEnable.setText(BTN_ENABLE);
 
         btnDisable = new Button(compAdminUserBtn, SWT.NONE);
         btnDisable.setEnabled(false);
         btnDisable.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false, 1, 1));
-        btnDisable.setText("Disable");
+        btnDisable.setText(BTN_DISABLE);
+
+        Label lblType = new Label(container, SWT.NONE);
+        lblType.setText(LABEL_TYPE);
+
+        txtType = new Text(container, SWT.READ_ONLY);
+        txtType.setText(LOADING);
 
         lblUserName = new Label(container, SWT.NONE);
         lblUserName.setText(LABEL_USER_NAME);
@@ -185,6 +213,12 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         txtUserName.setText(LOADING);
         txtUserName.setVisible(false);
 
+        Label lblResourceGroup = new Label(container, SWT.NONE);
+        lblResourceGroup.setText(LABEL_RES_GRP);
+
+        txtResGrp = new Text(container, SWT.READ_ONLY);
+        txtResGrp.setText(LOADING);
+
         lblPrimaryPassword = new Label(container, SWT.NONE);
         lblPrimaryPassword.setText(LABEL_PASSWORD);
         lblPrimaryPassword.setVisible(false);
@@ -192,6 +226,24 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         lnkPrimaryPassword = new Link(container, SWT.NONE);
         lnkPrimaryPassword.setText(COPY_TO_CLIPBOARD);
         lnkPrimaryPassword.setVisible(false);
+
+        lnkPrimaryPassword.addListener(SWT.Selection,
+                new AzureListenerWrapper(INSIGHT_NAME, "lnkPrimaryPassword", null) {
+                    @Override
+                    protected void handleEventFunc(Event event) {
+                        try {
+                            Utils.copyToSystemClipboard(password);
+                        } catch (Exception e) {
+                            onError(e.getMessage());
+                        }
+                    }
+                });
+
+        Label lblSubscriptionId = new Label(container, SWT.NONE);
+        lblSubscriptionId.setText(LABEL_SUBSCRIPTION);
+
+        txtSubscriptionId = new Text(container, SWT.READ_ONLY);
+        txtSubscriptionId.setText(LOADING);
 
         lblSecondaryPassword = new Label(container, SWT.NONE);
         lblSecondaryPassword.setText(LABEL_PASSWORD2);
@@ -201,33 +253,178 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         lnkSecondaryPassword.setText(COPY_TO_CLIPBOARD);
         lnkSecondaryPassword.setVisible(false);
 
-        setScrolledCompositeContent();
-        setChildrenTransparent(container);
+        lnkSecondaryPassword.addListener(SWT.Selection,
+                new AzureListenerWrapper(INSIGHT_NAME, "lnkSecondaryPassword", null) {
+                    @Override
+                    protected void handleEventFunc(Event event) {
+                        try {
+                            Utils.copyToSystemClipboard(password2);
+                        } catch (Exception e) {
+                            onError(e.getMessage());
+                        }
+                    }
+                });
 
-        lnkPrimaryPassword.addSelectionListener(new SelectionAdapter() {
+        Label lblRegion = new Label(container, SWT.NONE);
+        lblRegion.setText(LABEL_REGION);
+
+        txtRegion = new Text(container, SWT.READ_ONLY);
+        txtRegion.setText(LOADING);
+        new Label(container, SWT.NONE);
+        new Label(container, SWT.NONE);
+
+        Label lblLoginServerUrl = new Label(container, SWT.NONE);
+        lblLoginServerUrl.setText(LABEL_LOGIN_SERVER_URL);
+
+        txtLoginServerUrl = new Text(container, SWT.READ_ONLY);
+        txtLoginServerUrl.setText(LOADING);
+        new Label(container, SWT.NONE);
+        new Label(container, SWT.NONE);
+
+        label = new Label(container, SWT.SEPARATOR | SWT.HORIZONTAL);
+        label.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 4, 1));
+
+        sashForm = new SashForm(container, SWT.NONE);
+        sashForm.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 4, 1));
+
+        cmpoRepo = new Composite(sashForm, SWT.NONE);
+        cmpoRepo.setLayout(new GridLayout(1, false));
+
+        Label lblRepo = new Label(cmpoRepo, SWT.NONE);
+        lblRepo.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false, 1, 1));
+        lblRepo.setText(LABEL_REPOSITORY);
+
+        lstRepo = new org.eclipse.swt.widgets.List(cmpoRepo, SWT.BORDER);
+        lstRepo.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+        lstRepo.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "lstRepo", null) {
             @Override
-            public void widgetSelected(SelectionEvent event) {
-                try {
-                    Utils.copyToSystemClipboard(password);
-                } catch (Exception e) {
-                    onError(e.getMessage());
+            protected void handleEventFunc(Event event) {
+                int index = lstRepo.getSelectionIndex();
+                if (index < 0 || index >= lstRepo.getItemCount()) {
+                    return;
                 }
+                String selectedRepo = lstRepo.getItem(index);
+                if (Utils.isEmptyString(selectedRepo) || selectedRepo.equals(currentRepo)) {
+                    return;
+                }
+                currentRepo = selectedRepo;
+                disableWidgets(false, true);
+                containerExplorerPresenter.onListTags(subscriptionId, registryId, currentRepo, true /* isNextPage */);
             }
         });
 
-        lnkSecondaryPassword.addSelectionListener(new SelectionAdapter() {
+        repoToolBar = new ToolBar(cmpoRepo, SWT.FLAT | SWT.RIGHT);
+        repoToolBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
+
+        tltmRefreshRepo = new ToolItem(repoToolBar, SWT.NONE);
+        tltmRefreshRepo.setToolTipText(TLTM_REFRESH);
+        tltmRefreshRepo.setText(TLTM_REFRESH);
+        tltmRefreshRepo.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "tltmRefreshRepo", null) {
             @Override
-            public void widgetSelected(SelectionEvent event) {
-                try {
-                    Utils.copyToSystemClipboard(password2);
-                } catch (Exception e) {
-                    onError(e.getMessage());
-                }
+            protected void handleEventFunc(Event event) {
+                disableWidgets(true, true);
+                containerExplorerPresenter.onRefreshRepositories(subscriptionId, registryId, true /* isNextPage */);
             }
         });
 
-        btnEnable.addListener(SWT.Selection, event -> onAdminUserBtnClick());
-        btnDisable.addListener(SWT.Selection, event -> onAdminUserBtnClick());
+        tltmRepoPreviousPage = new ToolItem(repoToolBar, SWT.NONE);
+        tltmRepoPreviousPage.setToolTipText(TLTM_PREVIOUS_PAGE);
+        tltmRepoPreviousPage
+                .setImage(PlatformUI.getWorkbench().getSharedImages().getImage(ISharedImages.IMG_TOOL_BACK));
+        tltmRepoPreviousPage.addListener(SWT.Selection,
+                new AzureListenerWrapper(INSIGHT_NAME, "tltmRepoPreviousPage", null) {
+                    @Override
+                    protected void handleEventFunc(Event event) {
+                        disableWidgets(true, true);
+                        containerExplorerPresenter.onListRepositories(subscriptionId, registryId,
+                                false /* isNextPage */);
+                    }
+                });
+
+        tltmRepoNextPage = new ToolItem(repoToolBar, SWT.NONE);
+        tltmRepoNextPage.setToolTipText(TLTM_NEXT_PAGE);
+        tltmRepoNextPage.setImage(PlatformUI.getWorkbench().getSharedImages().getImage(ISharedImages.IMG_TOOL_FORWARD));
+        tltmRepoNextPage.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "tltmRepoNextPage", null) {
+            @Override
+            protected void handleEventFunc(Event event) {
+                disableWidgets(true, true);
+                containerExplorerPresenter.onListRepositories(subscriptionId, registryId, false /* isNextPage */);
+            }
+        });
+        cmpoTag = new Composite(sashForm, SWT.NONE);
+        cmpoTag.setLayout(new GridLayout(1, false));
+
+        lblTag = new Label(cmpoTag, SWT.NONE);
+        lblTag.setLayoutData(new GridData(SWT.CENTER, SWT.CENTER, true, false, 1, 1));
+        lblTag.setText(LABEL_TAG);
+
+        lstTag = new org.eclipse.swt.widgets.List(cmpoTag, SWT.BORDER);
+        lstTag.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 1, 1));
+
+        tagToolBar = new ToolBar(cmpoTag, SWT.FLAT | SWT.RIGHT);
+        tagToolBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 1, 1));
+
+        tltmRefreshTag = new ToolItem(tagToolBar, SWT.NONE);
+        tltmRefreshTag.setToolTipText(TLTM_REFRESH);
+        tltmRefreshTag.setText(TLTM_REFRESH);
+        tltmRefreshTag.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "tltmRefreshTag", null) {
+            @Override
+            protected void handleEventFunc(Event event) {
+                if (Utils.isEmptyString(currentRepo)) {
+                    return;
+                }
+                disableWidgets(false, true);
+                containerExplorerPresenter.onListTags(subscriptionId, registryId, currentRepo, true /* isNextPage */);
+            }
+        });
+
+        tltmTagPreviousPage = new ToolItem(tagToolBar, SWT.NONE);
+        tltmTagPreviousPage.setToolTipText(TLTM_PREVIOUS_PAGE);
+        tltmTagPreviousPage.setImage(PlatformUI.getWorkbench().getSharedImages().getImage(ISharedImages.IMG_TOOL_BACK));
+        tltmTagPreviousPage.addListener(SWT.Selection,
+                new AzureListenerWrapper(INSIGHT_NAME, "tltmTagPreviousPage", null) {
+                    @Override
+                    protected void handleEventFunc(Event event) {
+                        if (Utils.isEmptyString(currentRepo)) {
+                            return;
+                        }
+                        disableWidgets(false, true);
+                        containerExplorerPresenter.onListTags(subscriptionId, registryId, currentRepo,
+                                false /* isNextPage */);
+                    }
+                });
+
+        tltmTagNextPage = new ToolItem(tagToolBar, SWT.NONE);
+        tltmTagNextPage.setToolTipText(TLTM_NEXT_PAGE);
+        tltmTagNextPage.setImage(PlatformUI.getWorkbench().getSharedImages().getImage(ISharedImages.IMG_TOOL_FORWARD));
+        tltmTagNextPage.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "tltmTagNextPage", null) {
+            @Override
+            protected void handleEventFunc(Event event) {
+                if (Utils.isEmptyString(currentRepo)) {
+                    return;
+                }
+                disableWidgets(false, true);
+                containerExplorerPresenter.onListTags(subscriptionId, registryId, currentRepo, true /* isNextPage */);
+            }
+        });
+        sashForm.setWeights(new int[] { 1, 1 });
+
+        btnEnable.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "btnEnable", null) {
+            @Override
+            protected void handleEventFunc(Event event) {
+                disableWidgets(true, true);
+                onAdminUserBtnClick();
+            }
+        });
+
+        btnDisable.addListener(SWT.Selection, new AzureListenerWrapper(INSIGHT_NAME, "btnDisable", null) {
+            @Override
+            protected void handleEventFunc(Event event) {
+                disableWidgets(false, false);
+                onAdminUserBtnClick();
+            }
+        });
+        disableWidgets(true, true);
     }
 
     @Override
@@ -237,46 +434,49 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
 
     @Override
     public void showProperty(ContainerRegistryProperty property) {
-        registryId = property.getId();
         isAdminEnabled = property.isAdminEnabled();
-        subscriptionId = property.getSubscriptionId();
-
         txtRegistryName.setText(property.getName());
         txtType.setText(property.getType());
         txtResGrp.setText(property.getGroupName());
         txtSubscriptionId.setText(subscriptionId);
         txtRegion.setText(property.getRegionName());
         txtLoginServerUrl.setText(property.getLoginServerUrl());
-
-        if (isAdminEnabled) {
-            txtUserName.setText(property.getUserName());
-            password = property.getPassword();
-            password2 = property.getPassword2();
-        }
-        compAdminUserBtn.setEnabled(true);
-        updateAdminUserBtn(isAdminEnabled);
+        disableWidgets(true, true);
         lblUserName.setVisible(isAdminEnabled);
         txtUserName.setVisible(isAdminEnabled);
         lblPrimaryPassword.setVisible(isAdminEnabled);
         lnkPrimaryPassword.setVisible(isAdminEnabled);
         lblSecondaryPassword.setVisible(isAdminEnabled);
         lnkSecondaryPassword.setVisible(isAdminEnabled);
+        updateAdminUserBtn(isAdminEnabled);
+        if (isAdminEnabled) {
+            txtUserName.setText(property.getUserName());
+            password = property.getPassword();
+            password2 = property.getPassword2();
+            containerExplorerPresenter.onRefreshRepositories(subscriptionId, registryId, true /* isNextPage */);
+            sashForm.setVisible(true);
+        } else {
+            sashForm.setVisible(false);
+            progressBar.setVisible(false);
+        }
 
-        container.layout();
+        panelHolder.layout();
         setScrolledCompositeContent();
         this.setPartName(property.getName());
     }
 
     @Override
     public void listRepo(List<String> repos) {
-        // TODO Auto-generated method stub
-
+        lstRepo.removeAll();
+        fillList(repos, lstRepo);
+        enableWidgets();
     }
 
     @Override
     public void listTag(List<String> tags) {
-        // TODO Auto-generated method stub
-
+        lstTag.removeAll();
+        fillList(tags, lstTag);
+        enableWidgets();
     }
 
     @Override
@@ -292,6 +492,8 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         if (input instanceof ContainerRegistryExplorerEditorInput) {
             ContainerRegistryExplorerEditorInput containerInput = (ContainerRegistryExplorerEditorInput) input;
             this.setPartName(containerInput.getName());
+            this.subscriptionId = containerInput.getSubscriptionId();
+            this.registryId = containerInput.getId();
             containerExplorerPresenter.onGetRegistryProperty(containerInput.getSubscriptionId(),
                     containerInput.getId());
         }
@@ -334,9 +536,6 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
     }
 
     private void onAdminUserBtnClick() {
-        compAdminUserBtn.setEnabled(false);
-        btnEnable.setEnabled(false);
-        btnDisable.setEnabled(false);
         this.containerExplorerPresenter.onEnableAdminUser(subscriptionId, registryId, !isAdminEnabled);
     }
 
@@ -346,8 +545,8 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
     }
 
     private void setScrolledCompositeContent() {
-        scrolledComposite.setContent(container);
-        scrolledComposite.setMinSize(container.computeSize(SWT.DEFAULT, SWT.DEFAULT));
+        scrolledComposite.setContent(panelHolder);
+        scrolledComposite.setMinSize(panelHolder.computeSize(SWT.DEFAULT, SWT.DEFAULT));
     }
 
     private void setChildrenTransparent(Composite container) {
@@ -362,4 +561,57 @@ public class ContainerRegistryExplorerEditor extends EditorPart implements Conta
         }
     }
 
+    private void enableWidgets() {
+        updateAdminUserBtn(isAdminEnabled);
+        lstRepo.setEnabled(true);
+        tltmRefreshRepo.setEnabled(true);
+        progressBar.setVisible(false);
+        if (containerExplorerPresenter.hasNextRepoPage()) {
+            tltmRepoNextPage.setEnabled(true);
+        }
+        if (containerExplorerPresenter.hasPreviousRepoPage()) {
+            tltmRepoPreviousPage.setEnabled(true);
+        }
+        lstTag.setEnabled(true);
+        if (currentRepo == null) {
+            return;
+        }
+        tltmRefreshTag.setEnabled(true);
+        if (containerExplorerPresenter.hasNextRepoPage()) {
+            tltmTagNextPage.setEnabled(true);
+        }
+        if (containerExplorerPresenter.hasPreviousRepoPage()) {
+            tltmTagPreviousPage.setEnabled(true);
+        }
+    }
+
+    private void disableWidgets(boolean needResetRepo, boolean needResetTag) {
+        btnEnable.setEnabled(false);
+        btnDisable.setEnabled(false);
+        if (needResetRepo) {
+            currentRepo = null;
+            lstRepo.removeAll();
+        }
+        if (needResetTag) {
+            lstTag.removeAll();
+        }
+        lstRepo.setEnabled(false);
+        tltmRefreshRepo.setEnabled(false);
+        tltmRepoPreviousPage.setEnabled(false);
+        tltmRepoNextPage.setEnabled(false);
+        lstTag.setEnabled(false);
+        tltmRefreshTag.setEnabled(false);
+        tltmTagPreviousPage.setEnabled(false);
+        tltmTagNextPage.setEnabled(false);
+        progressBar.setVisible(true);
+    }
+
+    private void fillList(@NotNull List<String> list, @NotNull org.eclipse.swt.widgets.List widget) {
+        if (list.size() > 0) {
+            Collections.sort(list);
+            for (String item : list) {
+                widget.add(item);
+            }
+        }
+    }
 }
