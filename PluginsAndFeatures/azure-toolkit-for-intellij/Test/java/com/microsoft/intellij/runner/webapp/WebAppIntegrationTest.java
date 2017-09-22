@@ -83,10 +83,13 @@ public class WebAppIntegrationTest extends IntegrationTestBase {
 
     @Mock
     private ProgramRunner programRunner;
+
     @Mock
     private TextConsoleBuilderFactory textConsoleBuilderFactory;
+
     @Mock
     private ConsoleView consoleView;
+
     @Mock
     private FTPClient ftpClient;
 
@@ -171,6 +174,19 @@ public class WebAppIntegrationTest extends IntegrationTestBase {
         assertNotNull(selectedApp);
     }
 
+    @Test
+    public void testNewWebAppWithJar() throws Exception {
+        WebAppConfig webAppConfig = new WebAppConfig("barneytestapp6", "test.jar", "Tomcat 8.5", "barneytestrg3",
+                "barneytestplan3", "eastus", "Basic_B1", JavaVersion.JAVA_8_NEWEST, true, true, true, true,
+                "barneytestrg3");
+        WebAppSettingModel settingModel = new WebAppSettingModel();
+        settingModel = initialSetting(settingModel, webAppConfig);
+        WebAppRunState runState = new WebAppRunState(project, settingModel);
+        runState.execute(executor, programRunner);
+        testSchedulerProvider.triggerActions();
+        WebApp selectedApp = getWebApp(webAppConfig.webAppName);
+        assertNotNull(selectedApp);
+    }
     @Test
     public void testExistedWebApp() throws Exception {
 

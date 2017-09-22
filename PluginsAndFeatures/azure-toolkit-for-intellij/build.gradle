@@ -75,11 +75,7 @@ repositories {
 
 configurations {
     compile.exclude module:'slf4j-api'
-
-    compile.exclude module:'slf4j-simple'
     testCompile.exclude module:'htmlunit'
-    testCompile.exclude module:'logback-classic'
-    testCompile.exclude module:'commons-logging'
     cucumberRuntime {
         extendsFrom testRuntime
     }
@@ -108,6 +104,13 @@ dependencies {
         force=true
     }
 }
+
+test {
+    testLogging.showStandardStreams=true
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+} 
 
 task cucumberPackJar(type: Jar) {
     appendix = 'pathing'
