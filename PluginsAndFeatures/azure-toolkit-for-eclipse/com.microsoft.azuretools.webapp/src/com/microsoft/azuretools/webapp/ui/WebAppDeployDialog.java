@@ -2,6 +2,7 @@ package com.microsoft.azuretools.webapp.ui;
 
 import com.microsoft.azure.management.appservice.AppServicePlan;
 import com.microsoft.azure.management.appservice.JavaVersion;
+import com.microsoft.azure.management.appservice.OperatingSystem;
 import com.microsoft.azure.management.appservice.PublishingProfile;
 import com.microsoft.azure.management.appservice.WebApp;
 import com.microsoft.azure.management.resources.ResourceGroup;
@@ -439,34 +440,37 @@ public class WebAppDeployDialog extends AzureTitleAreaDialogWrapper {
         table.removeAll();
 
         for (SubscriptionDetail sd : srgMap.keySet()) {
-            if (!sd.isSelected())
+            if (!sd.isSelected() || srgMap.get(sd) == null) {
                 continue;
+            }
 
             Map<String, WebAppUtils.AspDetails> aspMap = new HashMap<>();
             for (ResourceGroup rg : srgMap.get(sd)) {
-                for (AppServicePlan asp : rgaspMap.get(rg)) {
-                    aspMap.put(asp.id(), new WebAppUtils.AspDetails(asp, rg));
+                if (rgaspMap.get(rg) != null) {
+                    for (AppServicePlan asp : rgaspMap.get(rg)) {
+                        aspMap.put(asp.id(), new WebAppUtils.AspDetails(asp, rg));
+                    }
                 }
             }
 
             for (ResourceGroup rg : srgMap.get(sd)) {
-                for (WebApp wa : rgwaMap.get(rg)) {
-                    TableItem item = new TableItem(table, SWT.NULL);
+                if (rgwaMap.get(rg) != null) {
+                    for (WebApp wa : rgwaMap.get(rg)) {
+                        if (wa.operatingSystem().equals(OperatingSystem.WINDOWS) && wa.javaVersion() != JavaVersion.OFF
+                                && aspMap.get(wa.appServicePlanId()) != null) {
+                            TableItem item = new TableItem(table, SWT.NULL);
+                            item.setText(new String[] { wa.name(), wa.javaVersion().toString(),
+                                    wa.javaContainer() + " " + wa.javaContainerVersion(), wa.resourceGroupName() });
 
-                    if (wa.javaVersion() != JavaVersion.OFF) {
-                        item.setText(new String[] { wa.name(), wa.javaVersion().toString(),
-                                wa.javaContainer() + " " + wa.javaContainerVersion(), wa.resourceGroupName() });
-                    } else {
-                        item.setText(new String[] { wa.name(), "Off", "N/A", wa.resourceGroupName() });
+                            WebAppDetails webAppDetails = new WebAppDetails();
+                            webAppDetails.webApp = wa;
+                            webAppDetails.subscriptionDetail = sd;
+                            webAppDetails.resourceGroup = rg;
+                            webAppDetails.appServicePlan = aspMap.get(wa.appServicePlanId()).getAsp();
+                            webAppDetails.appServicePlanResourceGroup = aspMap.get(wa.appServicePlanId()).getRg();
+                            webAppDetailsMap.put(wa.name(), webAppDetails);
+                        }
                     }
-
-                    WebAppDetails webAppDetails = new WebAppDetails();
-                    webAppDetails.webApp = wa;
-                    webAppDetails.subscriptionDetail = sd;
-                    webAppDetails.resourceGroup = rg;
-                    webAppDetails.appServicePlan = aspMap.get(wa.appServicePlanId()).getAsp();
-                    webAppDetails.appServicePlanResourceGroup = aspMap.get(wa.appServicePlanId()).getRg();
-                    webAppDetailsMap.put(wa.name(), webAppDetails);
                 }
             }
         }
@@ -494,7 +498,7 @@ public class WebAppDeployDialog extends AzureTitleAreaDialogWrapper {
         }
         String appServiceName = table.getItems()[selectedRow].getText(0);
         WebAppDetails wad = webAppDetailsMap.get(appServiceName);
-        if (wad.webApp.javaVersion() == JavaVersion.OFF) {
+        if (wad != null && wad.webApp != null && wad.webApp.javaVersion() == JavaVersion.OFF) {
             setErrorMessage("Select java based App Service");
             okButton.setEnabled(false);
             return false;
