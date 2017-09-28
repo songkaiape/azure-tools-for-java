@@ -105,23 +105,21 @@ public class WebAppOnLinuxDeployState implements RunProfileState {
                     Files.write(targetDockerfile, content.getBytes());
 
                     // build image
-                    String imageNameWithTag = deployModel.getPrivateRegistryImageSetting().getImageNameWithTag();
-                    processHandler.setText(String.format("Building image ...  [%s]", imageNameWithTag));
+                    PrivateRegistryImageSetting acrInfo = deployModel.getPrivateRegistryImageSetting();
+                    processHandler.setText(String.format("Building image ...  [%s]",
+                            acrInfo.getImageNameWithTag()));
                     DockerClient docker = DefaultDockerClient.fromEnv().build();
                     DockerUtil.buildImage(docker,
-                            imageNameWithTag,
+                            acrInfo.getImageNameWithTag(),
                             targetDockerfile.getParent(),
                             targetDockerfile.getFileName().toString(),
                             new DockerProgressHandler(processHandler)
                     );
 
                     // push to ACR
-                    PrivateRegistryImageSetting acrInfo = deployModel.getPrivateRegistryImageSetting();
                     processHandler.setText(String.format("Pushing to ACR ... [%s] ", acrInfo.getServerUrl()));
                     DockerUtil.pushImage(docker, acrInfo.getServerUrl(), acrInfo.getUsername(), acrInfo.getPassword(),
-                            acrInfo.getImageNameWithTag(),
-                            new DockerProgressHandler(processHandler)
-                    );
+                            acrInfo.getImageNameWithTag(), new DockerProgressHandler(processHandler));
 
                     // deploy
                     if (deployModel.isCreatingNewWebAppOnLinux()) {
@@ -157,6 +155,9 @@ public class WebAppOnLinuxDeployState implements RunProfileState {
                     AzureWebAppMvpModel.getInstance().listAllWebAppsOnLinux(true);
                     processHandler.setText("Job done");
                     processHandler.notifyProcessTerminated(0);
+                    if (deployModel.isCreatingNewWebAppOnLinux() && AzureUIRefreshCore.listeners != null) {
+                        AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH,null));
+                    }
                     sendTelemetry(true, null);
                 },
                 (err) -> {

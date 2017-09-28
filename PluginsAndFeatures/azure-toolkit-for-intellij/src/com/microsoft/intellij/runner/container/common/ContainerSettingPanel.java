@@ -42,6 +42,8 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.event.ItemEvent;
 import java.util.List;
 
@@ -58,6 +60,7 @@ public class ContainerSettingPanel implements ContainerSettingView {
     private JPanel pnlRoot;
     private JTextField txtStartupFile;
     private JLabel lblStartupFile;
+    private JLabel lblServerUrl;
 
     private static final String SELECT_REGISTRY = "<Select Container Registry>";
     private static final String LOADING = "<Loading...>";
@@ -111,7 +114,7 @@ public class ContainerSettingPanel implements ContainerSettingView {
                     index, boolean isSelected, boolean cellHasFocus) {
                 if (object != null) {
                     if (object instanceof Registry) {
-                        setText(((Registry)object).name());
+                        setText(((Registry) object).name());
                     } else {
                         setText(object.toString());
                     }
@@ -120,6 +123,23 @@ public class ContainerSettingPanel implements ContainerSettingView {
         });
 
         cbContainerRegistry.addItem(LOADING);
+
+        txtServerUrl.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                lblServerUrl.setText(txtServerUrl.getText() + "/");
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                lblServerUrl.setText(txtServerUrl.getText() + "/");
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                lblServerUrl.setText(txtServerUrl.getText() + "/");
+            }
+        });
     }
 
     public String getServerUrl() {
@@ -146,28 +166,17 @@ public class ContainerSettingPanel implements ContainerSettingView {
         return txtStartupFile.getText();
     }
 
-    public void setServerUrl(String url) {
-        txtServerUrl.setText(url);
-    }
-
-    public void setUserName(String userName) {
-        txtUserName.setText(userName);
-    }
-
-    public void setPasswordField(String password) {
-        passwordField.setText(password);
-    }
-
-    public void setImageTag(String imageTag) {
-        txtImageTag.setText(imageTag);
+    public void setTxtFields(PrivateRegistryImageSetting acrInfo) {
+        txtServerUrl.setText(acrInfo.getServerUrl());
+        txtUserName.setText(acrInfo.getUsername());
+        passwordField.setText(acrInfo.getPassword());
+        txtImageTag.setText(getImageTagWithoutServerUrl(acrInfo.getImageNameWithTag(), acrInfo
+                .getServerUrl()));
+        txtStartupFile.setText(acrInfo.getStartupFile());
     }
 
     public void setDockerPath(String path) {
         dockerFilePathTextField.setText(path);
-    }
-
-    public void setStartupFile(String startupFile) {
-        txtStartupFile.setText(startupFile);
     }
 
     private void disableWidgets() {
@@ -208,12 +217,25 @@ public class ContainerSettingPanel implements ContainerSettingView {
         txtServerUrl.setText(setting.getServerUrl());
         txtUserName.setText(setting.getUsername());
         passwordField.setText(setting.getPassword());
-        txtImageTag.setText(setting.getServerUrl() + "/");
+        txtImageTag.setText(getImageTagWithoutServerUrl(setting.getImageNameWithTag(), setting
+                .getServerUrl()));
         txtImageTag.requestFocus();
     }
 
     @Override
     public void disposeEditor() {
         presenter.onDetachView();
+    }
+
+    private String getImageTagWithoutServerUrl(String imageTag, String serverUrl) {
+        if (imageTag == null || serverUrl == null) {
+            return imageTag;
+        }
+        serverUrl += "/";
+        int index = imageTag.indexOf(serverUrl);
+        if (index >= 0) {
+            return imageTag.substring(index + serverUrl.length());
+        }
+        return imageTag;
     }
 }
