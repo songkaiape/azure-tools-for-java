@@ -34,16 +34,22 @@ public class PrivateRegistryImageSetting extends ImageSetting {
     public PrivateRegistryImageSetting(String serverUrl, String username, String password, String imageNameWithTag,
                                        String startupFile) {
         super(imageNameWithTag, startupFile);
-        this.serverUrl = serverUrl;
-        this.username = username;
-        this.password = password;
+        this.setServerUrl(serverUrl);
+        this.setUsername(username);
+        this.setPassword(password);
     }
 
     public String getServerUrl() {
         return serverUrl;
     }
 
+    /**
+     * remove all the tailing slash and set server URL.
+     */
     public void setServerUrl(String serverUrl) {
+        if (serverUrl != null) {
+            serverUrl = serverUrl.replaceAll("/+$", "");
+        }
         this.serverUrl = serverUrl;
     }
 
@@ -61,5 +67,13 @@ public class PrivateRegistryImageSetting extends ImageSetting {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    @Override
+    public String getImageNameWithTag() {
+        if (this.serverUrl != null && super.getImageNameWithTag() != null) {
+            return this.serverUrl + "/" + super.getImageNameWithTag();
+        }
+        return super.getImageNameWithTag();
     }
 }
