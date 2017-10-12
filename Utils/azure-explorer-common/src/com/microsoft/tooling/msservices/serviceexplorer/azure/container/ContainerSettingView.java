@@ -20,29 +20,24 @@
  * SOFTWARE.
  */
 
-package com.microsoft.intellij.runner.container.webapponlinux.ui;
+package com.microsoft.tooling.msservices.serviceexplorer.azure.container;
 
-import com.microsoft.azure.management.appservice.AppServicePlan;
-import com.microsoft.azure.management.appservice.PricingTier;
-import com.microsoft.azure.management.appservice.WebApp;
-import com.microsoft.azure.management.resources.Location;
-import com.microsoft.azure.management.resources.ResourceGroup;
-import com.microsoft.azure.management.resources.Subscription;
-import com.microsoft.azuretools.core.mvp.model.ResourceEx;
+import com.microsoft.azure.management.containerregistry.Registry;
+import com.microsoft.azuretools.azurecommons.helpers.NotNull;
+import com.microsoft.azuretools.core.mvp.model.webapp.PrivateRegistryImageSetting;
 import com.microsoft.azuretools.core.mvp.ui.base.MvpView;
 
 import java.util.List;
 
-public interface WebAppOnLinuxDeployView extends MvpView {
-    void renderWebAppOnLinuxList(List<ResourceEx<WebApp>> webAppOnLinuxList);
+public interface ContainerSettingView extends MvpView {
 
-    void renderSubscriptionList(List<Subscription> subscriptions);
+    void onListRegistries();
 
-    void renderResourceGroupList(List<ResourceGroup> resourceGroupList);
+    void listRegistries(@NotNull final List<Registry> registries);
 
-    void renderLocationList(List<Location> locationList);
+    void fillCredential(@NotNull final PrivateRegistryImageSetting setting);
 
-    void renderPricingTierList(List<PricingTier> pricingTierList);
+    void disposeEditor();
 
-    void renderAppServicePlanList(List<AppServicePlan> appServicePlans);
+    void setStartupFileVisible(boolean visible);
 }
