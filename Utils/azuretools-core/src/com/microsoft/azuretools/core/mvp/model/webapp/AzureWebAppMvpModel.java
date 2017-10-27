@@ -23,12 +23,28 @@
 
 package com.microsoft.azuretools.core.mvp.model.webapp;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import org.apache.commons.io.IOUtils;
+
 import com.microsoft.azure.management.Azure;
 import com.microsoft.azure.management.appservice.AppServicePlan;
 import com.microsoft.azure.management.appservice.OperatingSystem;
 import com.microsoft.azure.management.appservice.PricingTier;
 import com.microsoft.azure.management.appservice.WebApp;
 import com.microsoft.azure.management.appservice.WebContainer;
+import com.microsoft.azure.management.appservice.implementation.CsmPublishingProfileOptionsInner;
 import com.microsoft.azure.management.resources.Subscription;
 import com.microsoft.azure.management.resources.fluentcore.arm.Region;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
@@ -36,14 +52,6 @@ import com.microsoft.azuretools.azurecommons.helpers.NotNull;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.utils.WebAppUtils;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public class AzureWebAppMvpModel {
 
@@ -252,6 +260,12 @@ public class AzureWebAppMvpModel {
         return app;
     }
 
+    public void updateWebAppSettings(String sid, String webAppId, Map<String, String> appSettings) throws Exception {
+        WebApp app = getWebAppById(sid, webAppId);
+        clearTags(app);
+        app.update().withAppSettings(appSettings).apply();
+    }
+
     public void deleteWebAppOnLinux(String sid, String appid) throws IOException {
         deleteWebApp(sid, appid);
     }
@@ -382,6 +396,22 @@ public class AzureWebAppMvpModel {
             ret.addAll(wal);
         }
         return ret;
+    }
+
+    public boolean getPublishingProfileXmlWithSecrets(String sid, String webAppId, String filePath) throws Exception {
+        WebApp app = getWebAppById(sid ,webAppId);
+        File file = new File(Paths.get(filePath, app.name() + "_" + System.currentTimeMillis() + ".PublishSettings").toString());
+        file.createNewFile();
+        try (InputStream inputStream = app.manager().inner().webApps()
+                .listPublishingProfileXmlWithSecrets(app.resourceGroupName(), app.name(), new CsmPublishingProfileOptionsInner());
+                OutputStream outputStream = new FileOutputStream(file);
+        ) {
+            IOUtils.copy(inputStream, outputStream);
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     public void cleanWebApps() {
