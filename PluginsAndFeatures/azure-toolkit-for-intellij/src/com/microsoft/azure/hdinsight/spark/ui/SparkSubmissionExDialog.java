@@ -37,9 +37,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.net.URI;
+import java.util.Optional;
 
 public class SparkSubmissionExDialog extends JDialog {
-    private SparkSubmissionContentPanel contentPane;
+    @Nullable
+    private SparkSubmissionContentPanelConfigurable contentControl;
 
     private final int margin = 10;
     private final String DialogTitle = "Spark Submission";
@@ -65,13 +67,11 @@ public class SparkSubmissionExDialog extends JDialog {
         Image image = StreamUtil.getImageResourceFile(CommonConst.ProductIConPath).getImage();
         setIconImage(image);
 
-        contentPane = new SparkSubmissionContentPanel(submitModel, new CallBack(){
-            public void run() {
-                setSubmitButtonStatus();
-                pack();
-            }
+        contentControl = new SparkSubmissionContentPanelConfigurable(this.project, () -> {
+            setSubmitButtonStatus();
+            pack();
         });
-        setContentPane(contentPane);
+        setContentPane(getContentPane());
 
         setModal(true);
         setTitle(DialogTitle);
@@ -85,12 +85,24 @@ public class SparkSubmissionExDialog extends JDialog {
             }
         });
 
-        contentPane.registerKeyboardAction(new ActionListener() {
+        getContentPane().registerKeyboardAction(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 onCancel();
             }
         }, KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+    }
+
+    @Override
+    @Nullable
+    public SparkSubmissionContentPanel getContentPane() {
+        return getContentPaneOptional().orElse(null);
+    }
+
+    private Optional<SparkSubmissionContentPanel> getContentPaneOptional() {
+        return Optional.ofNullable(contentControl)
+                .map(SparkSubmissionContentPanelConfigurable::getComponent)
+                .map(SparkSubmissionContentPanel.class::cast);
     }
 
     private void addOperationJPanel() {
@@ -104,8 +116,8 @@ public class SparkSubmissionExDialog extends JDialog {
         operationPanel.add(buttonCancel);
         operationPanel.add(buttonHelper);
 
-        contentPane.add(operationPanel,
-                new GridBagConstraints(1, ++(contentPane.displayLayoutCurrentRow),
+        getContentPane().add(operationPanel,
+                new GridBagConstraints(1, ++(getContentPane().displayLayoutCurrentRow),
                         0, 1,
                         1, 0,
                         GridBagConstraints.EAST, GridBagConstraints.NONE,
@@ -134,13 +146,14 @@ public class SparkSubmissionExDialog extends JDialog {
     }
 
     private void onOK() {
-        submitModel.action(contentPane.constructSubmissionParameter());
+        contentControl.getData(submitModel);
+        submitModel.action(submitModel.getSubmissionParameter());
         dispose();
     }
     //endregion
 
     private void setSubmitButtonStatus() {
-        if (this.contentPane == null || this.contentPane.haveErrorMessage()) {
+        if (this.getContentPaneOptional().map(SparkSubmissionContentPanel::haveErrorMessage).orElse(true)) {
             if (this.buttonSubmit != null){
                 this.buttonSubmit.setEnabled(false);
             }

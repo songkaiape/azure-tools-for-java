@@ -21,7 +21,7 @@
  */
 package com.microsoft.azure.hdinsight.sdk.cluster;
 
-import com.microsoft.azure.hdinsight.sdk.common.CommonConstant;
+import com.microsoft.azure.hdinsight.common.ClusterManagerEx;
 import com.microsoft.azure.hdinsight.sdk.common.HDIException;
 import com.microsoft.azure.hdinsight.sdk.storage.ADLSStorageAccount;
 import com.microsoft.azure.hdinsight.sdk.storage.HDStorageAccount;
@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,6 +79,14 @@ public class ClusterDetail implements IClusterDetail {
     }
 
     @Override
+    public String getTitle() {
+        return Optional.ofNullable(getSparkVersion())
+                .filter(ver -> !ver.trim().isEmpty())
+                .map(ver -> getName() + "(Spark: " + ver + ")")
+                .orElse(getName());
+    }
+
+    @Override
     public String getSparkVersion() {
         ClusterProperties clusterProperties = clusterRawInfo.getProperties();
         if(clusterProperties == null) {
@@ -113,7 +122,7 @@ public class ClusterDetail implements IClusterDetail {
     }
 
     public String getConnectionUrl(){
-        return String.format(CommonConstant.DEFAULT_CLUSTER_ENDPOINT, getName());
+        return ClusterManagerEx.getInstance().getClusterConnectionString(getName());
     }
 
     public String getCreateDate() {

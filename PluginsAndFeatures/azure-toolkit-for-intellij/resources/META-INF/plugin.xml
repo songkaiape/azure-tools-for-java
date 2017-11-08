@@ -1,7 +1,7 @@
 <idea-plugin>
   <id>com.microsoft.tooling.msservices.intellij.azure</id>
   <name>Azure Toolkit for IntelliJ</name>
-  <version>3.0.10</version>
+  <version>3.0.11</version>
   <vendor email="java@microsoft.com" url="http://www.microsoft.com">Microsoft</vendor>
 
   <description><![CDATA[
@@ -18,6 +18,15 @@
   <change-notes>
     <![CDATA[
     <html>
+      <h3>[3.0.11]</h3>
+      <ul>
+        <li>Support view/edit properties of Azure Web App (Windows/Linux).</li>
+        <li>Support interactive login mode for Azure China.</li>
+        <li>Support running docker locally for multiple modules in current project (simultaneously).</li>
+        <li>Users can now use the same code for both Spark local run and cluster run, which means they can test locally and then submit to cluster without modification.</li>
+        <li>HDInsight tools for IntelliJ now generate run/debug configuration automatically to make Spark job run/debug easier for both local and cluster run.</li>
+        <li>Fixed some bugs.</li>
+      </ul>
       <h3>[3.0.10]</h3>
       <ul>
         <li>Support pushing docker image of the project to Azure Container Registry.</li>
@@ -107,9 +116,13 @@
         canCloseContents="false"
         icon="/icons/SparkSubmissionToolWindow.png"/>
 
+    <executor implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobRunExecutor" id="SparkJobRun" />
+    <executor implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobDebugExecutor" id="SparkJobDebug" />
     <configurationType implementation="com.microsoft.intellij.runner.webapp.WebAppConfigurationType"/>
     <configurationType implementation="com.microsoft.azure.hdinsight.spark.run.configuration.RemoteDebugRunConfigurationType"/>
+    <runConfigurationProducer implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobLocalRunConfigurationProducer"/>
     <programRunner implementation="com.microsoft.intellij.runner.webapp.webappconfig.WebAppRunner"/>
+    <programRunner implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobRunner" />
     <programRunner implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobDebuggerRunner" />
     <configurationType implementation="com.microsoft.intellij.runner.container.AzureDockerSupportConfigurationType"/>
   </extensions>
@@ -150,7 +163,7 @@
             class="com.microsoft.intellij.actions.AzureCodeSamples"
             text="Azure Code Samples"
             description="Opens an Azure Code Samples page in your default browser"
-            icon="/icons/small/CodeSamples_16.png">
+            icon="/icons/CodeSamples_16.png">
     </action>
 
     <action id="Actions.SubmitSparkApplicationAction"
@@ -179,6 +192,10 @@
     <action id="Actions.WebAppOnLinux" class="com.microsoft.intellij.actions.WebAppOnLinuxAction"
             text="Run on Web App for Containers" description="Run on Web App for Containers"
             icon="/icons/PublishWebAppOnLinux_16.png">
+    </action>
+    <action id="Actions.SparkJobDisconnect" class="com.microsoft.azure.hdinsight.spark.run.action.SparkBatchJobDisconnectAction"
+            text="Disconnect" description="Disconnect the log view from remote Spark Job"
+            icon="/icons/SparkJobDisconnect.png">
     </action>
 
     <group id="AzurePopupGroup" text="Azure" description="Azure" icon="/icons/azure.png" popup="true"

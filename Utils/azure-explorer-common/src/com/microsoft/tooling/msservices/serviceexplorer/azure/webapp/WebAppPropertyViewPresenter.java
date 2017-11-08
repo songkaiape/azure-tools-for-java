@@ -1,7 +1,9 @@
 package com.microsoft.tooling.msservices.serviceexplorer.azure.webapp;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.microsoft.azure.management.Azure;
 import com.microsoft.azure.management.appservice.AppServicePlan;
@@ -9,9 +11,11 @@ import com.microsoft.azure.management.appservice.AppSetting;
 import com.microsoft.azure.management.appservice.WebApp;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.azurecommons.helpers.NotNull;
+import com.microsoft.azuretools.azurecommons.helpers.Nullable;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.core.mvp.ui.base.MvpPresenter;
 import com.microsoft.azuretools.core.mvp.ui.webapp.WebAppProperty;
+import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 
 import rx.Observable;
@@ -51,9 +55,17 @@ public class WebAppPropertyViewPresenter<V extends WebAppPropertyMvpView> extend
     }
 
     public void onUpdateWebAppProperty(@NotNull String sid, @NotNull String resId,
-            @NotNull Map<String, String> appSettings) {
+            @NotNull Map<String, String> cacheSettings, @NotNull Map<String, String> editedSettings) {
+        Map<String, String> telemetryMap = new HashMap<>();
+        telemetryMap.put("SubscriptionId", sid);
         Observable.fromCallable(() -> {
-            AzureWebAppMvpModel.getInstance().updateWebAppSettings(sid, resId, appSettings);
+            Set<String> toRemove = new HashSet<>();
+            for (String key : cacheSettings.keySet()) {
+                if (!editedSettings.containsKey(key)) {
+                    toRemove.add(key);
+                }
+            }
+            AzureWebAppMvpModel.getInstance().updateWebAppSettings(sid, resId, editedSettings, toRemove);
             return true;
         }).subscribeOn(getSchedulerProvider().io())
                 .subscribe(property -> DefaultLoader.getIdeHelper().invokeLater(() -> {
@@ -61,17 +73,21 @@ public class WebAppPropertyViewPresenter<V extends WebAppPropertyMvpView> extend
                         return;
                     }
                     getMvpView().showPropertyUpdateResult(true);
+                    sendTelemetry("UpdateAppSettings", telemetryMap, true, null);
                 }), e -> {
                     errorHandler(CANNOT_GET_WEB_APP_PROPERTY, (Exception) e);
                     if (isViewDetached()) {
                         return;
                     }
                     getMvpView().showPropertyUpdateResult(false);
+                    sendTelemetry("UpdateAppSettings", telemetryMap, false, e.getMessage());
                 });
     }
 
     public void onGetPublishingProfileXmlWithSecrets(@NotNull String sid, @NotNull String webAppId,
             @NotNull String filePath) {
+        Map<String, String> telemetryMap = new HashMap<>();
+        telemetryMap.put("SubscriptionId", sid);
         Observable.fromCallable(() -> {
             return AzureWebAppMvpModel.getInstance().getPublishingProfileXmlWithSecrets(sid, webAppId, filePath);
         }).subscribeOn(getSchedulerProvider().io()).subscribe(res -> DefaultLoader.getIdeHelper().invokeLater(() -> {
@@ -79,12 +95,14 @@ public class WebAppPropertyViewPresenter<V extends WebAppPropertyMvpView> extend
                 return;
             }
             getMvpView().showGetPublishingProfileResult(res);
+            sendTelemetry("DownloadPublishProfile", telemetryMap, true, null);
         }), e -> {
             errorHandler(CANNOT_GET_WEB_APP_PROPERTY, (Exception) e);
             if (isViewDetached()) {
                 return;
             }
             getMvpView().showGetPublishingProfileResult(false);
+            sendTelemetry("DownloadPublishProfile", telemetryMap, false, e.getMessage());
         });
     }
 
@@ -126,5 +144,14 @@ public class WebAppPropertyViewPresenter<V extends WebAppPropertyMvpView> extend
             }
             getMvpView().onErrorWithException(msg, e);
         });
+    }
+
+    private void sendTelemetry(@NotNull String actionName, @NotNull Map<String, String> telemetryMap, boolean success,
+            @Nullable String errorMsg) {
+        telemetryMap.put("Success", String.valueOf(success));
+        if (!success) {
+            telemetryMap.put("ErrorMsg", errorMsg);
+        }
+        AppInsightsClient.createByType(AppInsightsClient.EventType.Action, "WebApp", actionName, telemetryMap);
     }
 }

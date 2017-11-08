@@ -22,13 +22,19 @@
 package com.microsoft.azure.hdinsight.sdk.cluster;
 
 import com.google.gson.annotations.Expose;
+import com.microsoft.azure.AzureEnvironment;
+import com.microsoft.azure.hdinsight.common.ClusterManagerEx;
 import com.microsoft.azure.hdinsight.sdk.common.HDIException;
 import com.microsoft.azure.hdinsight.sdk.storage.HDStorageAccount;
 import com.microsoft.azure.hdinsight.sdk.storage.IHDIStorageAccount;
+import com.microsoft.azuretools.authmanage.AuthMethodManager;
+import com.microsoft.azuretools.authmanage.Environment;
 import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
+import com.microsoft.azuretools.sdkmanage.AzureManager;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 public class HDInsightAdditionalClusterDetail implements IClusterDetail {
 
@@ -60,6 +66,14 @@ public class HDInsightAdditionalClusterDetail implements IClusterDetail {
     }
 
     @Override
+    public String getTitle() {
+        return Optional.ofNullable(getSparkVersion())
+                .filter(ver -> !ver.trim().isEmpty())
+                .map(ver -> getName() + "(Spark: " + ver + ")")
+                .orElse(getName());
+    }
+
+    @Override
     public String getState() {
         return null;
     }
@@ -71,7 +85,7 @@ public class HDInsightAdditionalClusterDetail implements IClusterDetail {
 
     @Override
     public String getConnectionUrl() {
-        return String.format("https://%s.azurehdinsight.net", getName());
+        return ClusterManagerEx.getInstance().getClusterConnectionString(this.clusterName);
     }
 
     @Override

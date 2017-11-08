@@ -21,8 +21,10 @@
  */
 package com.microsoft.azure.hdinsight.spark.run.configuration;
 
+import com.intellij.execution.application.ApplicationConfigurationType;
 import com.intellij.execution.configurations.ConfigurationFactory;
 import com.intellij.execution.configurations.ConfigurationType;
+import com.intellij.execution.configurations.ConfigurationTypeUtil;
 import com.intellij.openapi.util.IconLoader;
 
 import com.microsoft.azure.hdinsight.common.CommonConst;
@@ -33,9 +35,9 @@ import javax.swing.*;
 
 public class RemoteDebugRunConfigurationType implements ConfigurationType {
 
-    private static final String DISPLAY_NAME = "Submit Spark Job";
-    private static final String ID = "SubmitSparkJob_Run_Configuration";
-    private static final String DESCRIPTION = "Submit Spark Job Run Configuration Type";
+    private static final String DISPLAY_NAME = "Azure HDInsight Spark Job";
+    private static final String ID = "SubmitSparkJob_Configuration";
+    private static final String DESCRIPTION = "Azure HDInsight Spark Job Configuration Type";
 
     @Override
     public String getDisplayName() {
@@ -61,5 +63,10 @@ public class RemoteDebugRunConfigurationType implements ConfigurationType {
     @Override
     public ConfigurationFactory[] getConfigurationFactories() {
         return new ConfigurationFactory[]{ new RemoteDebugConfigurationFactory(this)};
+    }
+
+    @NotNull
+    public static RemoteDebugRunConfigurationType getInstance() {
+        return ConfigurationTypeUtil.findConfigurationType(RemoteDebugRunConfigurationType.class);
     }
 }

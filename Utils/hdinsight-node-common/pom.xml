@@ -4,7 +4,7 @@
         <relativePath>../pom.xml</relativePath>
         <groupId>com.microsoft.azuretools</groupId>
         <artifactId>utils</artifactId>
-        <version>3.0.10</version>
+        <version>3.0.11</version>
     </parent>
     <groupId>com.microsoft.azuretools</groupId>
     <artifactId>hdinsight-node-common</artifactId>
@@ -129,6 +129,22 @@
     </build>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.jmockit</groupId>
+            <artifactId>jmockit</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.microsoft.azuretools</groupId>
             <artifactId>azuretools-core</artifactId>
